@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { AlertCircle, ArrowRight, Calendar, CheckCircle2, Clock, Loader2, MapPin, QrCode } from 'lucide-react';
+import { AlertCircle, ArrowRight, Calendar, CheckCircle2, Clock, FileText, Loader2, MapPin, QrCode } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import Login from './Login';
@@ -35,19 +35,12 @@ export default function SelfCheckin() {
   const handleConfirm = async () => {
     setStatus({ type: 'loading', message: 'Đang xác thực danh tính...' });
 
-    // Step 1: Link Auth Account to Physical Staff Record via Email
     let staffId = user?.staff_id;
     
     if (!staffId && user?.email) {
       const { data: staffMatch } = await supabase
-        .from('staff')
-        .select('id')
-        .eq('email', user.email)
-        .maybeSingle();
-        
-      if (staffMatch) {
-         staffId = staffMatch.id;
-      }
+        .from('staff').select('id').eq('email', user.email).maybeSingle();
+      if (staffMatch) staffId = staffMatch.id;
     }
 
     if (!staffId) {
@@ -55,12 +48,8 @@ export default function SelfCheckin() {
       return;
     }
     
-    // Check if already checked in
     const { data: existing } = await supabase.from('attendance')
-      .select('id')
-      .eq('meeting_id', meeting.id)
-      .eq('staff_id', staffId)
-      .maybeSingle();
+      .select('id').eq('meeting_id', meeting.id).eq('staff_id', staffId).maybeSingle();
       
     if (existing) {
       setStatus({ type: 'error', message: 'Bạn đã điểm danh cuộc họp này rồi.' });
@@ -84,7 +73,7 @@ export default function SelfCheckin() {
 
   if (status.type === 'loading') {
     return (
-      <div className="login-bg min-h-screen flex items-center justify-center">
+      <div style={{ background: 'linear-gradient(135deg, #312E81, #4C1D95, #6D28D9)', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="w-10 h-10 animate-spin text-white/70" />
           <span className="text-sm font-medium text-white/50">Đang tải...</span>
@@ -94,31 +83,60 @@ export default function SelfCheckin() {
   }
 
   return (
-    <div className="login-bg w-full min-h-screen flex flex-col justify-center p-6 font-sans">
-      <div className="w-full max-w-md mx-auto relative z-10">
-        <div className="login-card overflow-hidden animate-fade-in-up">
+    <div style={{
+      background: 'linear-gradient(135deg, #312E81, #4C1D95, #6D28D9)',
+      minHeight: '100vh',
+      width: '100%',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '16px',
+      boxSizing: 'border-box',
+      overflow: 'hidden',
+    }}>
+      <div style={{ width: '100%', maxWidth: '420px', position: 'relative', zIndex: 10 }}>
+        <div style={{
+          background: 'rgba(255,255,255,0.12)',
+          backdropFilter: 'blur(24px)',
+          WebkitBackdropFilter: 'blur(24px)',
+          border: '1px solid rgba(255,255,255,0.2)',
+          borderRadius: '24px',
+          boxShadow: '0 25px 50px rgba(0,0,0,0.25)',
+          overflow: 'hidden',
+        }}>
           {/* Header */}
-          <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-8 text-white text-center relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -translate-y-12 translate-x-12" />
-            <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full translate-y-8 -translate-x-8" />
-            <div className="relative z-10">
-              <div className="w-16 h-16 bg-white/15 rounded-2xl flex items-center justify-center mx-auto mb-4 backdrop-blur-sm border border-white/20">
-                <QrCode size={32} />
-              </div>
-              <h1 className="text-xl font-bold uppercase tracking-tight">Xác nhận điểm danh</h1>
-              <p className="text-sm text-white/60 mt-1 font-medium">UBND Phường An Phú</p>
+          <div style={{
+            background: 'linear-gradient(135deg, #4F46E5, #7C3AED)',
+            padding: '24px 20px',
+            textAlign: 'center',
+            color: 'white',
+          }}>
+            <div style={{
+              width: 56, height: 56,
+              background: 'rgba(255,255,255,0.15)',
+              borderRadius: 16,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              margin: '0 auto 12px',
+              border: '1px solid rgba(255,255,255,0.2)',
+            }}>
+              <QrCode size={28} />
             </div>
+            <h1 style={{ fontSize: 18, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '-0.01em', margin: 0 }}>
+              Xác nhận điểm danh
+            </h1>
+            <p style={{ fontSize: 13, opacity: 0.6, marginTop: 4, fontWeight: 500 }}>UBND Phường An Phú</p>
           </div>
 
           {/* Body */}
-          <div className="p-8 bg-white/90 backdrop-blur-sm">
+          <div style={{ padding: '24px 20px', background: 'rgba(255,255,255,0.92)' }}>
             {status.type === 'success' ? (
               <div className="text-center py-4 animate-fade-in-up">
                 <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-5">
                   <CheckCircle2 size={32} />
                 </div>
                 <h2 className="text-xl font-bold text-brand-text mb-2">Thành công!</h2>
-                <p className="text-brand-text/50 text-sm mb-8">{status.message}</p>
+                <p className="text-brand-text/50 text-sm mb-6">{status.message}</p>
                 <button onClick={() => navigate('/')} className="btn-primary w-full justify-center h-12">
                   <span>Về trang chủ</span>
                   <ArrowRight size={16} />
@@ -130,30 +148,41 @@ export default function SelfCheckin() {
                   <AlertCircle size={32} />
                 </div>
                 <h2 className="text-xl font-bold text-brand-text mb-2">Lỗi</h2>
-                <p className="text-brand-text/50 text-sm mb-8">{status.message}</p>
+                <p className="text-brand-text/50 text-sm mb-6">{status.message}</p>
                 <button onClick={() => navigate('/')} className="btn-secondary w-full justify-center h-12">
                   <span>Về trang chủ</span>
                 </button>
               </div>
             ) : (
               <>
-                <div className="space-y-4 mb-8">
+                <div className="space-y-3 mb-6">
                   <h3 className="text-lg font-bold text-brand-text">{meeting?.title}</h3>
-                  <div className="space-y-3">
+                  
+                  {/* Nội dung cuộc họp */}
+                  {meeting?.content && (
+                    <div className="flex items-start gap-3 text-sm text-brand-text/60">
+                      <div className="w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center shrink-0 mt-0.5">
+                        <FileText size={15} className="text-purple-500" />
+                      </div>
+                      <span className="font-medium leading-relaxed">{meeting.content}</span>
+                    </div>
+                  )}
+
+                  <div className="space-y-2.5">
                     <div className="flex items-center gap-3 text-sm text-brand-text/60">
-                      <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center">
+                      <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center shrink-0">
                         <Calendar size={15} className="text-primary" />
                       </div>
                       <span className="font-medium">{meeting?.meeting_date}</span>
                     </div>
                     <div className="flex items-center gap-3 text-sm text-brand-text/60">
-                      <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center">
+                      <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center shrink-0">
                         <Clock size={15} className="text-primary" />
                       </div>
                       <span className="font-medium">{meeting?.meeting_time}</span>
                     </div>
                     <div className="flex items-center gap-3 text-sm text-brand-text/60">
-                      <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center">
+                      <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center shrink-0">
                         <MapPin size={15} className="text-primary" />
                       </div>
                       <span className="font-medium">{meeting?.location}</span>
