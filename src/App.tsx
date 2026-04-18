@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Building2, CalendarDays, FileBarChart, LayoutDashboard, LogOut, Menu, QrCode, Settings, Users, X, ChevronLeft } from 'lucide-react';
+import { Building2, CalendarDays, Camera, FileBarChart, LayoutDashboard, LogOut, Menu, QrCode, Settings, Users, X, ChevronLeft } from 'lucide-react';
 import { cn } from './lib/utils';
 import { useAuth } from './contexts/AuthContext';
 import Dashboard from './pages/Dashboard';
@@ -10,8 +10,9 @@ import QRScanner from './pages/QRScanner';
 import Reports from './pages/Reports';
 import SettingsPage from './pages/Settings';
 import StaffManagement from './pages/StaffManagement';
+import StaffQRScanner from './pages/StaffQRScanner';
 
-type Page = 'dashboard' | 'staff' | 'departments' | 'meetings' | 'qr' | 'reports' | 'settings';
+type Page = 'dashboard' | 'staff' | 'departments' | 'meetings' | 'qr' | 'staff-qr' | 'reports' | 'settings';
 
 export default function App() {
   const [activePage, setActivePage] = useState<Page>('dashboard');
@@ -70,6 +71,7 @@ export default function App() {
     { id: 'staff', label: 'Nhân sự', icon: Users, roles: ['admin'] },
     { id: 'departments', label: 'Cơ cấu', icon: Building2, roles: ['admin'] },
     { id: 'qr', label: 'Điểm danh QR', icon: QrCode, roles: ['admin'] },
+    { id: 'staff-qr', label: 'Quét QR', icon: Camera, roles: ['staff'] },
     { id: 'reports', label: 'Báo cáo', icon: FileBarChart, roles: ['admin', 'viewer'] },
     { id: 'settings', label: 'Cài đặt', icon: Settings, roles: ['admin', 'staff', 'viewer'] },
   ];
@@ -214,6 +216,7 @@ export default function App() {
           )}
           {activePage === 'meetings' && <MeetingManagement />}
           {activePage === 'qr' && <QRScanner />}
+          {activePage === 'staff-qr' && <StaffQRScanner />}
           {activePage === 'reports' && <Reports />}
           {activePage === 'settings' && <SettingsPage />}
         </div>
