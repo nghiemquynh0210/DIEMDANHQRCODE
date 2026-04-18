@@ -1,0 +1,7 @@
+{
+  "name": "Hệ thống Điểm danh QR Code UBND Phường",
+  "description": "Hệ thống quản lý cán bộ, cuộc họp và điểm danh bằng mã QR dành cho UBND Phường.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
