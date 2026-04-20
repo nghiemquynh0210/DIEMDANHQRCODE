@@ -37,6 +37,13 @@ export default function App() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Auto-route normal staff to QR scanner by default
+  useEffect(() => {
+    if (user && user.role === 'staff' && activePage === 'dashboard') {
+      setActivePage('staff-qr');
+    }
+  }, [user]);
+
   const navigateToPage = (
     page: Page,
     params: { departmentId?: string; neighborhoodId?: string; triggerAdd?: boolean } = {},
