@@ -20,22 +20,18 @@ export default function StaffQRScanner() {
 
       await scanner.start(
         { facingMode: 'environment' },
-        { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 },
+        { fps: 10, qrbox: { width: 220, height: 220 }, aspectRatio: 1.0 },
         async (decodedText) => {
           if (isProcessingRef.current) return;
           isProcessingRef.current = true;
 
           try {
-            // Parse the QR URL to find meetingId
             let meetingId: string | null = null;
             try {
               const url = new URL(decodedText);
               meetingId = url.searchParams.get('meetingId');
             } catch {
-              // Not a URL, maybe just the meetingId itself
-              if (/^\d+$/.test(decodedText)) {
-                meetingId = decodedText;
-              }
+              if (/^\d+$/.test(decodedText)) meetingId = decodedText;
             }
 
             if (!meetingId) {
@@ -44,17 +40,15 @@ export default function StaffQRScanner() {
               return;
             }
 
-            // Get meeting info
             const { data: meeting, error: meetingError } = await supabase
               .from('meetings').select('*').eq('id', meetingId).single();
 
             if (!meeting || meetingError) {
-              setStatus({ type: 'error', message: 'Cuộc họp không tồn tại hoặc đã bị xóa.' });
+              setStatus({ type: 'error', message: 'Cuộc họp không tồn tại.' });
               setTimeout(() => { isProcessingRef.current = false; }, 2000);
               return;
             }
 
-            // Find staff by email
             let staffId: string | null = null;
             if (user?.email) {
               const { data: staffMatch } = await supabase
@@ -63,12 +57,11 @@ export default function StaffQRScanner() {
             }
 
             if (!staffId) {
-              setStatus({ type: 'error', message: 'Tài khoản chưa liên kết với hồ sơ cán bộ.' });
+              setStatus({ type: 'error', message: 'Tài khoản chưa liên kết hồ sơ cán bộ.' });
               setTimeout(() => { isProcessingRef.current = false; }, 3000);
               return;
             }
 
-            // Check if already checked in
             const { data: existing } = await supabase.from('attendance')
               .select('id').eq('meeting_id', meetingId).eq('staff_id', staffId).maybeSingle();
 
@@ -78,7 +71,6 @@ export default function StaffQRScanner() {
               return;
             }
 
-            // Insert attendance
             const { error: insertError } = await supabase.from('attendance').insert({
               meeting_id: Number(meetingId),
               staff_id: Number(staffId),
@@ -88,15 +80,14 @@ export default function StaffQRScanner() {
             if (insertError) {
               setStatus({ type: 'error', message: insertError.message });
             } else {
-              setStatus({ type: 'success', message: `✅ Điểm danh "${meeting.title}" thành công!` });
-              // Stop camera after success
+              setStatus({ type: 'success', message: `Điểm danh "${meeting.title}" thành công!` });
               setTimeout(() => stopCamera(), 2000);
             }
           } finally {
             setTimeout(() => { isProcessingRef.current = false; }, 3000);
           }
         },
-        () => {} // ignore scan misses
+        () => {}
       );
 
       setCameraOn(true);
@@ -118,65 +109,108 @@ export default function StaffQRScanner() {
   }, []);
 
   return (
-    <div className="max-w-lg mx-auto space-y-6">
-      {/* Header Card */}
-      <div className="card-no-hover text-center">
-        <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white shadow-lg shadow-indigo-500/20">
-          <QrCode size={28} />
+    <div style={{ width: '100%', maxWidth: 480, margin: '0 auto' }}>
+      {/* Header */}
+      <div style={{
+        background: 'white',
+        borderRadius: 16,
+        padding: '20px 16px',
+        textAlign: 'center',
+        marginBottom: 16,
+        border: '1px solid #f3f4f6',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+      }}>
+        <div style={{
+          width: 52, height: 52,
+          background: 'linear-gradient(135deg, #4F46E5, #7C3AED)',
+          borderRadius: 14,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          margin: '0 auto 10px',
+          color: 'white',
+          boxShadow: '0 4px 12px rgba(79,70,229,0.2)',
+        }}>
+          <QrCode size={24} />
         </div>
-        <h2 className="text-xl font-bold text-brand-text">Quét QR Điểm Danh</h2>
-        <p className="text-sm text-brand-text/50 font-medium mt-1">Mở camera và hướng vào mã QR của cuộc họp</p>
+        <h2 style={{ fontSize: 17, fontWeight: 700, color: '#1e293b', margin: '0 0 4px' }}>Quét QR Điểm Danh</h2>
+        <p style={{ fontSize: 13, color: '#94a3b8', fontWeight: 500, margin: 0 }}>Hướng camera vào mã QR cuộc họp</p>
       </div>
 
-      {/* Camera Toggle Button */}
+      {/* Camera Button */}
       <button
         onClick={cameraOn ? stopCamera : startCamera}
-        className={`w-full flex items-center justify-center gap-3 py-4 px-6 rounded-2xl font-bold text-base transition-all ${
-          cameraOn
-            ? 'bg-red-50 text-red-600 border-2 border-red-200 hover:bg-red-100'
-            : 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-xl shadow-indigo-500/25 hover:shadow-2xl hover:translate-y-[-2px]'
-        }`}
+        style={{
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 10,
+          padding: '14px 20px',
+          borderRadius: 14,
+          fontWeight: 700,
+          fontSize: 15,
+          border: cameraOn ? '2px solid #FCA5A5' : 'none',
+          background: cameraOn ? '#FEF2F2' : 'linear-gradient(135deg, #4F46E5, #7C3AED)',
+          color: cameraOn ? '#DC2626' : 'white',
+          cursor: 'pointer',
+          boxShadow: cameraOn ? 'none' : '0 8px 24px rgba(79,70,229,0.25)',
+          marginBottom: 16,
+        }}
       >
-        {cameraOn ? <CameraOff size={22} /> : <Camera size={22} />}
-        {cameraOn ? 'Tắt Camera' : '📷 Bật Camera Quét QR'}
+        {cameraOn ? <CameraOff size={20} /> : <Camera size={20} />}
+        {cameraOn ? 'Tắt Camera' : 'Bật Camera Quét QR'}
       </button>
 
       {/* Camera View */}
       {cameraOn && (
-        <div className="animate-fade-in-up">
-          <div className="rounded-2xl overflow-hidden border-2 border-indigo-200 bg-black">
-            <div id={containerId} className="w-full" style={{ minHeight: 300 }} />
-          </div>
+        <div style={{
+          borderRadius: 16,
+          overflow: 'hidden',
+          border: '2px solid #c7d2fe',
+          background: '#000',
+          marginBottom: 16,
+        }}>
+          <div id={containerId} style={{ width: '100%', minHeight: 280 }} />
         </div>
       )}
 
       {!cameraOn && <div id={containerId} style={{ display: 'none' }} />}
 
-      {/* Status Message */}
+      {/* Status */}
       {status.type !== 'idle' && (
-        <div className={`p-4 rounded-2xl flex items-start gap-3 animate-fade-in-up ${
-          status.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
-          status.type === 'error' ? 'bg-red-50 text-red-600 border border-red-200' :
-          status.type === 'info' ? 'bg-blue-50 text-blue-600 border border-blue-200' :
-          'bg-gray-50 text-gray-600 border border-gray-200'
-        }`}>
-          {status.type === 'success' && <CheckCircle2 size={20} className="shrink-0 mt-0.5" />}
-          {status.type === 'error' && <AlertCircle size={20} className="shrink-0 mt-0.5" />}
-          {status.type === 'loading' && <Loader2 size={20} className="shrink-0 mt-0.5 animate-spin" />}
-          <span className="font-medium text-sm">{status.message}</span>
+        <div style={{
+          padding: '12px 14px',
+          borderRadius: 14,
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: 10,
+          marginBottom: 16,
+          background: status.type === 'success' ? '#ECFDF5' : status.type === 'error' ? '#FEF2F2' : status.type === 'info' ? '#EFF6FF' : '#F9FAFB',
+          color: status.type === 'success' ? '#059669' : status.type === 'error' ? '#DC2626' : status.type === 'info' ? '#2563EB' : '#6B7280',
+          border: `1px solid ${status.type === 'success' ? '#A7F3D0' : status.type === 'error' ? '#FECACA' : status.type === 'info' ? '#BFDBFE' : '#E5E7EB'}`,
+        }}>
+          {status.type === 'success' && <CheckCircle2 size={18} style={{ flexShrink: 0, marginTop: 1 }} />}
+          {status.type === 'error' && <AlertCircle size={18} style={{ flexShrink: 0, marginTop: 1 }} />}
+          {status.type === 'loading' && <Loader2 size={18} style={{ flexShrink: 0, marginTop: 1, animation: 'spin 1s linear infinite' }} />}
+          <span style={{ fontWeight: 600, fontSize: 13, lineHeight: 1.4 }}>{status.message}</span>
         </div>
       )}
 
       {/* Instructions */}
       {!cameraOn && status.type === 'idle' && (
-        <div className="card-no-hover space-y-3">
-          <h3 className="font-bold text-sm text-brand-text">Hướng dẫn:</h3>
-          <ol className="text-sm text-brand-text/60 space-y-2 list-decimal list-inside">
-            <li>Bấm nút <strong>"Bật Camera Quét QR"</strong> ở trên</li>
-            <li>Cho phép trình duyệt truy cập camera</li>
-            <li>Hướng camera vào mã QR của cuộc họp</li>
-            <li>Hệ thống tự động nhận diện và điểm danh cho bạn</li>
-          </ol>
+        <div style={{
+          background: 'white',
+          borderRadius: 16,
+          padding: '16px',
+          border: '1px solid #f3f4f6',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+        }}>
+          <h3 style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', margin: '0 0 10px' }}>Hướng dẫn:</h3>
+          <div style={{ fontSize: 13, color: '#64748b', lineHeight: 1.7 }}>
+            <p style={{ margin: '0 0 6px' }}>1. Bấm <strong>"Bật Camera Quét QR"</strong></p>
+            <p style={{ margin: '0 0 6px' }}>2. Cho phép trình duyệt truy cập camera</p>
+            <p style={{ margin: '0 0 6px' }}>3. Hướng camera vào mã QR cuộc họp</p>
+            <p style={{ margin: 0 }}>4. Hệ thống tự động điểm danh cho bạn</p>
+          </div>
         </div>
       )}
     </div>

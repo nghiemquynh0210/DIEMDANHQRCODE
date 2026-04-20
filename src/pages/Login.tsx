@@ -23,7 +23,7 @@ export default function Login() {
       // Assuming for now the admin uses admin@example.com or we handle it via email.
       // If the user inputs "admin", we might need to suffix it if we set up emails that way, e.g. "admin@ubuntu.local" 
       // For general compatibility, let's assume they enter an email or we format it.
-      const email = username.includes('@') ? username : `${username}@anphu.local`;
+      const email = username.includes('@') ? username : `${username}@anphu.com`;
       
       const { error: authError } = await supabase.auth.signInWithPassword({
         email,
@@ -31,7 +31,7 @@ export default function Login() {
       });
 
       if (authError) {
-        setError('Đăng nhập thất bại. Kiểm tra lại thông tin.');
+        setError(`Đăng nhập thất bại: ${authError.message}`);
       }
       // On success, AuthContext's onAuthStateChange will trigger and user will be populated, thus unmounting <Login />
     } catch {

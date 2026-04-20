@@ -2,6 +2,8 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 
+const SUPER_ADMINS = ['nghiemquynh0210@gmail.com'];
+
 interface AuthUser {
   id: string;
   email: string;
@@ -31,18 +33,59 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const resolveUser = async (supabaseUser: User) => {
+    const baseUser: AuthUser = {
+      id: supabaseUser.id,
+      email: supabaseUser.email || '',
+      username: supabaseUser.user_metadata?.full_name || supabaseUser.user_metadata?.username || supabaseUser.email?.split('@')[0] || 'User',
+      role: supabaseUser.user_metadata?.role || 'staff',
+      staff_id: supabaseUser.user_metadata?.staff_id || null,
+    };
+
+    // Check if this user has been promoted to admin via staff table
+    if (supabaseUser.email) {
+      const { data: staffRecord } = await supabase
+        .from('staff')
+        .select('id, status, full_name')
+        .eq('email', supabaseUser.email)
+        .maybeSingle();
+
+      if (staffRecord) {
+        baseUser.staff_id = staffRecord.id;
+        baseUser.username = staffRecord.full_name || baseUser.username;
+        // If staff status is 'admin', override role to admin
+        if (staffRecord.status === 'admin') {
+          baseUser.role = 'admin';
+        }
+      }
+    }
+
+    // Super admin override — always admin regardless of staff table
+    if (SUPER_ADMINS.includes(baseUser.email)) {
+      baseUser.role = 'admin';
+    }
+
+    return baseUser;
+  };
+
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session);
-      setUser(session?.user ? extractAuthUser(session.user) : null);
+      if (session?.user) {
+        const resolved = await resolveUser(session.user);
+        setUser(resolved);
+      }
       setLoading(false);
     });
 
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setSession(session);
-      setUser(session?.user ? extractAuthUser(session.user) : null);
+      if (session?.user) {
+        const resolved = await resolveUser(session.user);
+        setUser(resolved);
+      } else {
+        setUser(null);
+      }
       setLoading(false);
     });
 
@@ -51,19 +94,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signOut = async () => {
     await supabase.auth.signOut();
-  };
-
-  // Helper to map Supabase User to our specific AuthUser structure
-  const extractAuthUser = (supabaseUser: User): AuthUser => {
-    // We assume role and username are stored in user_metadata
-    // Defaults: role = 'staff', username = email prefix or 'User'
-    return {
-      id: supabaseUser.id,
-      email: supabaseUser.email || '',
-      username: supabaseUser.user_metadata?.username || supabaseUser.email?.split('@')[0] || 'User',
-      role: supabaseUser.user_metadata?.role || 'admin', // Default admin for testing phase
-      staff_id: supabaseUser.user_metadata?.staff_id || null,
-    };
   };
 
   return (

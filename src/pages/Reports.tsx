@@ -9,7 +9,7 @@ export default function Reports() {
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [selectedMeetingId, setSelectedMeetingId] = useState('');
   const [attendance, setAttendance] = useState<Attendance[]>([]);
-  const [statusFilter, setStatusFilter] = useState<'all' | 'present' | 'late'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'present' | 'late' | 'absent'>('all');
 
   useEffect(() => {
     supabase.from('meetings').select('*').order('meeting_date', { ascending: false }).order('meeting_time', { ascending: false })
@@ -22,13 +22,40 @@ export default function Reports() {
 
   useEffect(() => {
     if (!selectedMeetingId) return;
-    supabase
-      .from('attendance')
-      .select('*, staff(full_name, staff_code, departments(name), positions(name), neighborhoods(name))')
-      .eq('meeting_id', selectedMeetingId)
-      .order('checkin_time', { ascending: false })
-      .then(({ data }) => {
-        const mapped = (data || []).map((item: any) => ({
+
+    const fetchUnifiedAttendance = async () => {
+      try {
+        const meeting = meetings.find(m => String(m.id) === String(selectedMeetingId));
+        if (!meeting) return;
+
+        const { data: attData } = await supabase
+          .from('attendance')
+          .select('*, staff(id, full_name, staff_code, departments(name), positions(name), neighborhoods(name))')
+          .eq('meeting_id', selectedMeetingId)
+          .order('checkin_time', { ascending: false });
+
+        let staffQuery = supabase.from('staff').select('id, full_name, staff_code, departments(name), positions(name), neighborhoods(name)').eq('status', 'active');
+        
+        const orConditions = [];
+        if (meeting.participant_department_ids?.length) {
+            orConditions.push(`department_id.in.(${meeting.participant_department_ids.join(',')})`);
+        }
+        if (meeting.participant_position_ids?.length) {
+            orConditions.push(`position_id.in.(${meeting.participant_position_ids.join(',')})`);
+        }
+        if (meeting.participant_neighborhood_ids?.length) {
+            orConditions.push(`neighborhood_id.in.(${meeting.participant_neighborhood_ids.join(',')})`);
+        }
+        
+        if (orConditions.length > 0) {
+            staffQuery = staffQuery.or(orConditions.join(','));
+        }
+
+        const { data: staffData } = await staffQuery;
+
+        const attendedStaffIds = new Set((attData || []).map(a => a.staff_id));
+
+        const mappedAttendance = (attData || []).map((item: any) => ({
           ...item,
           full_name: item.staff?.full_name || '--',
           staff_code: item.staff?.staff_code || '--',
@@ -36,9 +63,31 @@ export default function Reports() {
           position_name: item.staff?.positions?.name || '--',
           neighborhood_name: item.staff?.neighborhoods?.name || '--',
         }));
-        setAttendance(mapped);
-      });
-  }, [selectedMeetingId]);
+
+        const absentStaff = (staffData || []).filter(s => !attendedStaffIds.has(s.id));
+
+        const mappedAbsent = absentStaff.map((s: any) => ({
+            id: `absent-${s.id}`,
+            meeting_id: selectedMeetingId,
+            staff_id: s.id,
+            checkin_time: null,
+            checkin_method: null,
+            status: 'absent',
+            full_name: s.full_name || '--',
+            staff_code: s.staff_code || '--',
+            department_name: s.departments?.name || '--',
+            position_name: s.positions?.name || '--',
+            neighborhood_name: s.neighborhoods?.name || '--',
+        }));
+
+        setAttendance([...mappedAttendance, ...mappedAbsent]);
+      } catch (err) {
+        console.error('Error unifying attendance:', err);
+      }
+    };
+
+    fetchUnifiedAttendance();
+  }, [selectedMeetingId, meetings]);
 
   const rows = useMemo(() => attendance.filter((item) => statusFilter === 'all' || item.status === statusFilter), [attendance, statusFilter]);
 
@@ -50,8 +99,8 @@ export default function Reports() {
       'Chức danh': item.position_name,
       'Phòng ban': item.department_name,
       'Khu phố': item.neighborhood_name,
-      'Thời gian quét': formatTime(item.checkin_time),
-      'Trạng thái': item.status === 'present' ? 'Đúng giờ' : 'Đi trễ',
+      'Thời gian quét': item.checkin_time ? formatTime(item.checkin_time) : '--:--',
+      'Trạng thái': item.status === 'present' ? 'Đúng giờ' : item.status === 'late' ? 'Đi trễ' : 'Vắng',
     })));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Báo cáo');
@@ -60,6 +109,7 @@ export default function Reports() {
 
   const presentCount = attendance.filter((r) => r.status === 'present').length;
   const lateCount = attendance.filter((r) => r.status === 'late').length;
+  const absentCount = attendance.filter((r) => r.status === 'absent').length;
 
   return (
     <div className="space-y-6">
@@ -81,6 +131,7 @@ export default function Reports() {
             <option value="all">Tất cả trạng thái</option>
             <option value="present">Đúng giờ</option>
             <option value="late">Đi trễ</option>
+            <option value="absent">Vắng</option>
           </select>
         </div>
         <div className="flex gap-3">
@@ -94,7 +145,7 @@ export default function Reports() {
       </div>
 
       {/* Stats Bar */}
-      <div className="flex gap-4">
+      <div className="flex flex-wrap gap-4">
         <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-50 border border-emerald-100">
           <div className="w-2 h-2 rounded-full bg-emerald-500" />
           <span className="text-xs font-semibold text-emerald-700">Đúng giờ: {presentCount}</span>
@@ -102,6 +153,10 @@ export default function Reports() {
         <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-50 border border-amber-100">
           <div className="w-2 h-2 rounded-full bg-amber-500" />
           <span className="text-xs font-semibold text-amber-700">Đi trễ: {lateCount}</span>
+        </div>
+        <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-50 border border-rose-100">
+          <div className="w-2 h-2 rounded-full bg-rose-500" />
+          <span className="text-xs font-semibold text-rose-700">Vắng: {absentCount}</span>
         </div>
         <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-50 border border-indigo-100">
           <span className="text-xs font-semibold text-indigo-700">Tổng: {rows.length}</span>
@@ -140,11 +195,11 @@ export default function Reports() {
                   <div className="text-[10px] text-brand-text/35">{item.department_name || '--'} / {item.neighborhood_name || '--'}</div>
                 </td>
                 <td>
-                  <span className="font-mono text-sm font-medium">{formatTime(item.checkin_time)}</span>
+                  <span className="font-mono text-sm font-medium">{item.checkin_time ? formatTime(item.checkin_time) : '--:--'}</span>
                 </td>
                 <td>
-                  <span className={`badge ${item.status === 'present' ? 'badge-success' : 'badge-warning'}`}>
-                    {item.status === 'present' ? 'Đúng giờ' : 'Đi trễ'}
+                  <span className={`badge ${item.status === 'present' ? 'badge-success' : item.status === 'late' ? 'badge-warning' : 'badge-danger'}`}>
+                    {item.status === 'present' ? 'Đúng giờ' : item.status === 'late' ? 'Đi trễ' : 'Vắng'}
                   </span>
                 </td>
               </tr>

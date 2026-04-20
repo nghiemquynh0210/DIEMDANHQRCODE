@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Building2, CalendarDays, MapPinned, Shapes, Users, TrendingUp, Clock } from 'lucide-react';
+import { Building2, CalendarDays, MapPinned, Shapes, Users, TrendingUp, Clock, MapPin, FileText } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 export default function Dashboard() {
@@ -14,37 +14,53 @@ export default function Dashboard() {
           { count: totalPositions },
           { count: totalNeighborhoods },
           { count: totalMeetings },
-          { data: recentMeetings }
+          { data: recentMeetings },
+          { data: allStaff }
         ] = await Promise.all([
           supabase.from('staff').select('id', { count: 'exact', head: true }),
           supabase.from('departments').select('id', { count: 'exact', head: true }),
           supabase.from('positions').select('id', { count: 'exact', head: true }),
           supabase.from('neighborhoods').select('id', { count: 'exact', head: true }),
           supabase.from('meetings').select('id', { count: 'exact', head: true }),
-          supabase.from('meetings').select('id').order('meeting_date', { ascending: false }).limit(1)
+          supabase.from('meetings').select('*').order('meeting_date', { ascending: false }).limit(1),
+          supabase.from('staff').select('id, department_id, position_id, neighborhood_id').eq('status', 'active')
         ]);
 
         let present = 0, late = 0, absent = 0;
         if (recentMeetings && recentMeetings.length > 0) {
-          const meetingId = recentMeetings[0].id;
+          const meeting = recentMeetings[0];
+          const meetingId = meeting.id;
           const { data: attendance } = await supabase
             .from('attendance')
-            .select('status')
+            .select('status, staff_id')
             .eq('meeting_id', meetingId);
             
           if (attendance) {
             present = attendance.filter(a => a.status === 'present').length;
             late = attendance.filter(a => a.status === 'late').length;
-            absent = attendance.filter(a => a.status === 'absent').length;
+            
+            let invitedStaff = allStaff || [];
+            if (meeting.participant_department_ids?.length || meeting.participant_position_ids?.length || meeting.participant_neighborhood_ids?.length) {
+              invitedStaff = invitedStaff.filter((s: any) => 
+                (meeting.participant_department_ids || []).includes(s.department_id) ||
+                (meeting.participant_position_ids || []).includes(s.position_id) ||
+                (meeting.participant_neighborhood_ids || []).includes(s.neighborhood_id)
+              );
+            }
+            
+            const attendedIds = new Set(attendance.map((a: any) => a.staff_id));
+            absent = invitedStaff.filter((s: any) => !attendedIds.has(s.id)).length;
           }
         }
 
+        const latestMeeting = recentMeetings && recentMeetings.length > 0 ? recentMeetings[0] : null;
         setStats({
           totalStaff: totalStaff || 0,
           totalDepartments: totalDepartments || 0,
           totalPositions: totalPositions || 0,
           totalNeighborhoods: totalNeighborhoods || 0,
           totalMeetings: totalMeetings || 0,
+          lastMeeting: latestMeeting,
           lastMeetingStats: { present, late, absent }
         });
       } catch (error) {
@@ -112,15 +128,32 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Meeting Info */}
         <div className="lg:col-span-2 card">
-          <div className="flex items-center gap-3 mb-5">
+          <div className="flex items-center gap-3 mb-4">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white shadow-lg shadow-indigo-500/20">
               <CalendarDays size={20} />
             </div>
             <div>
               <h3 className="text-base font-bold text-brand-text">Cuộc họp gần nhất</h3>
-              <p className="text-xs text-brand-text/50 font-medium">{stats.lastMeetingTitle}</p>
             </div>
           </div>
+
+          {/* Meeting Details */}
+          {stats.lastMeeting && (
+            <div className="mb-5 p-4 rounded-xl bg-indigo-50/50 border border-indigo-100/60 space-y-2">
+              <h4 className="font-bold text-brand-text text-sm">{stats.lastMeeting.title}</h4>
+              {stats.lastMeeting.content && (
+                <div className="flex items-start gap-2 text-xs text-brand-text/60">
+                  <FileText size={13} className="text-purple-500 shrink-0 mt-0.5" />
+                  <span>{stats.lastMeeting.content}</span>
+                </div>
+              )}
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-brand-text/50 font-medium">
+                <span className="flex items-center gap-1"><CalendarDays size={12} className="text-primary" /> {stats.lastMeeting.meeting_date}</span>
+                <span className="flex items-center gap-1"><Clock size={12} className="text-primary" /> {stats.lastMeeting.meeting_time}</span>
+                {stats.lastMeeting.location && <span className="flex items-center gap-1"><MapPin size={12} className="text-primary" /> {stats.lastMeeting.location}</span>}
+              </div>
+            </div>
+          )}
 
           {/* Progress Bar */}
           <div className="mb-6">
@@ -177,16 +210,20 @@ export default function Dashboard() {
 
           <div className="flex-1 space-y-3">
             <div className="flex items-center justify-between p-3 rounded-xl bg-indigo-50/60 border border-indigo-100/60">
+              <span className="text-xs font-semibold text-brand-text/60">Tổng yêu cầu tham gia</span>
+              <span className="text-sm font-bold text-indigo-600 font-mono">{total}</span>
+            </div>
+            <div className="flex items-center justify-between p-3 rounded-xl bg-indigo-50/60 border border-indigo-100/60">
               <span className="text-xs font-semibold text-brand-text/60">Tỉ lệ có mặt</span>
               <span className="text-sm font-bold text-indigo-600 font-mono">{presentPct}%</span>
             </div>
             <div className="flex items-center justify-between p-3 rounded-xl bg-indigo-50/60 border border-indigo-100/60">
-              <span className="text-xs font-semibold text-brand-text/60">Tổng điểm danh</span>
-              <span className="text-sm font-bold text-indigo-600 font-mono">{stats.lastMeetingStats.present + stats.lastMeetingStats.late}</span>
+              <span className="text-xs font-semibold text-brand-text/60">Đã điểm danh/có mặt</span>
+              <span className="text-sm font-bold text-emerald-600 font-mono">{stats.lastMeetingStats.present + stats.lastMeetingStats.late}</span>
             </div>
-            <div className="flex items-center justify-between p-3 rounded-xl bg-indigo-50/60 border border-indigo-100/60">
-              <span className="text-xs font-semibold text-brand-text/60">Chưa điểm danh</span>
-              <span className="text-sm font-bold text-red-500 font-mono">{stats.lastMeetingStats.absent}</span>
+            <div className="flex items-center justify-between p-3 rounded-xl bg-red-50/60 border border-red-100/60">
+              <span className="text-xs font-semibold text-red-600/70">Chưa điểm danh (Vắng)</span>
+              <span className="text-sm font-bold text-red-600 font-mono">{stats.lastMeetingStats.absent}</span>
             </div>
           </div>
 

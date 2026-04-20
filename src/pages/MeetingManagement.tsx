@@ -10,6 +10,7 @@ export default function MeetingManagement() {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [positions, setPositions] = useState<Position[]>([]);
   const [neighborhoods, setNeighborhoods] = useState<Neighborhood[]>([]);
+  const [allStaff, setAllStaff] = useState<any[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Meeting | null>(null);
   const [attendance, setAttendance] = useState<any[]>([]);
@@ -34,17 +35,20 @@ export default function MeetingManagement() {
         { data: m },
         { data: d },
         { data: p },
-        { data: n }
+        { data: n },
+        { data: s }
       ] = await Promise.all([
         supabase.from('meetings').select('*').order('meeting_date', { ascending: false }).order('meeting_time', { ascending: false }),
         supabase.from('departments').select('*'),
         supabase.from('positions').select('*'),
         supabase.from('neighborhoods').select('*'),
+        supabase.from('staff').select('id, department_id, position_id, neighborhood_id, full_name, staff_code, departments(name), positions(name), neighborhoods(name)').eq('status', 'active'),
       ]);
       setMeetings(m || []);
       setDepartments(d || []);
       setPositions(p || []);
       setNeighborhoods(n || []);
+      setAllStaff(s || []);
     } catch (err) {
       console.error('Failed to load data:', err);
     }
@@ -53,28 +57,73 @@ export default function MeetingManagement() {
   useEffect(() => { load(); }, []);
 
   const toggle = (key: 'participant_department_ids' | 'participant_position_ids' | 'participant_neighborhood_ids', id: number) => {
-    setForm((prev) => ({
-      ...prev,
-      [key]: prev[key].includes(id) ? prev[key].filter((item) => item !== id) : [...prev[key], id],
-    }));
+    if (key === 'participant_position_ids') {
+      const clickedPos = positions.find(p => p.id === id);
+      if (clickedPos) {
+        const name = clickedPos.name.toLowerCase();
+        let relatedIds = [id];
+        
+        if (name === 'bí thư') {
+          relatedIds = positions.filter(p => !p.name.toLowerCase().includes('phó') && p.name.toLowerCase().includes('bí thư')).map(p => p.id);
+        } else if (name === 'phó bí thư') {
+          relatedIds = positions.filter(p => p.name.toLowerCase().includes('phó bí thư')).map(p => p.id);
+        } else if (name === 'chi ủy viên') {
+          relatedIds = positions.filter(p => p.name.toLowerCase().includes('chi ủy viên')).map(p => p.id);
+        } else if (name === 'chỉ huy trưởng') {
+          relatedIds = positions.filter(p => p.name.toLowerCase().includes('chỉ huy trưởng') && !p.name.toLowerCase().includes('phó')).map(p => p.id);
+        } else if (name === 'phó chỉ huy trưởng') {
+          relatedIds = positions.filter(p => p.name.toLowerCase().includes('phó chỉ huy trưởng')).map(p => p.id);
+        } else if (name === 'trưởng ban công tác mặt trận' || name === 'trưởng ban ctmt') {
+          relatedIds = positions.filter(p => p.name.toLowerCase().includes('mặt trận') || p.name.toLowerCase().includes('ctmt')).map(p => p.id);
+        }
+
+        setForm(prev => {
+          const arr = prev[key];
+          if (arr.includes(id)) {
+            // Uncheck all related
+            return { ...prev, [key]: arr.filter(i => !relatedIds.includes(i)) };
+          } else {
+            // Check all related
+            return { ...prev, [key]: Array.from(new Set([...arr, ...relatedIds])) };
+          }
+        });
+        return;
+      }
+    }
+
+    setForm((prev) => {
+      const arr = prev[key];
+      if (arr.includes(id)) {
+        return { ...prev, [key]: arr.filter((i) => i !== id) };
+      } else {
+        return { ...prev, [key]: [...arr, id] };
+      }
+    });
   };
 
   const save = async (event: React.FormEvent) => {
     event.preventDefault();
     try {
+      let result;
       if (editing) {
-        await supabase.from('meetings').update(form).eq('id', editing.id);
+        result = await supabase.from('meetings').update(form).eq('id', editing.id);
       } else {
-        await supabase.from('meetings').insert(form);
+        result = await supabase.from('meetings').insert(form);
+      }
+      
+      if (result.error) {
+         console.error('Supabase DB error: ', result.error);
+         alert('Lỗi khi lưu dữ liệu do cơ sở dữ liệu: ' + result.error.message);
+         return;
       }
       
       setShowForm(false);
       setEditing(null);
       setForm({ title: '', content: '', participant_department_ids: [], participant_position_ids: [], participant_neighborhood_ids: [], meeting_date: new Date().toISOString().split('T')[0], meeting_time: '08:00', location: 'Hội trường UBND phường An Phú' });
       load();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Save error:', err);
-      alert('Lỗi kết nối máy chủ.');
+      alert('Lỗi kết nối máy chủ hoặc logic Javascript nội bộ: ' + (err.message || ''));
     }
   };
 
@@ -107,7 +156,18 @@ export default function MeetingManagement() {
       .eq('meeting_id', meeting.id)
       .order('checkin_time', { ascending: false });
 
-    const mapped = (data || []).map((item: any) => ({
+    let invitedStaff = allStaff;
+    if (meeting.participant_department_ids?.length || meeting.participant_position_ids?.length || meeting.participant_neighborhood_ids?.length) {
+      invitedStaff = allStaff.filter(s => 
+        (meeting.participant_department_ids || []).includes(s.department_id) ||
+        (meeting.participant_position_ids || []).includes(s.position_id) ||
+        (meeting.participant_neighborhood_ids || []).includes(s.neighborhood_id)
+      );
+    }
+
+    const attendedStaffIds = new Set((data || []).map(a => a.staff_id));
+
+    const mappedAttendance = (data || []).map((item: any) => ({
       ...item,
       full_name: item.staff?.full_name || '--',
       staff_code: item.staff?.staff_code || '--',
@@ -116,8 +176,33 @@ export default function MeetingManagement() {
       neighborhood_name: item.staff?.neighborhoods?.name || '--',
     }));
 
-    setAttendance(mapped);
+    const absentStaff = invitedStaff.filter(s => !attendedStaffIds.has(s.id));
+    const mappedAbsent = absentStaff.map((s: any) => ({
+      id: `absent-${s.id}`,
+      staff_id: s.id,
+      meeting_id: meeting.id,
+      checkin_time: null,
+      status: 'absent',
+      full_name: s.full_name || '--',
+      staff_code: s.staff_code || '--',
+      department_name: s.departments?.name || '--',
+      position_name: s.positions?.name || '--',
+      neighborhood_name: s.neighborhoods?.name || '--',
+    }));
+
+    setAttendance([...mappedAttendance, ...mappedAbsent]);
     setAttendanceTitle(meeting.title);
+  };
+
+  const getInvitedStaffCount = () => {
+     if (form.participant_department_ids.length === 0 && form.participant_position_ids.length === 0 && form.participant_neighborhood_ids.length === 0) {
+        return allStaff.length;
+     }
+     return allStaff.filter(s => 
+        form.participant_department_ids.includes(s.department_id) || 
+        form.participant_position_ids.includes(s.position_id) || 
+        form.participant_neighborhood_ids.includes(s.neighborhood_id)
+     ).length;
   };
 
   return (
@@ -155,6 +240,21 @@ export default function MeetingManagement() {
           <Selection title="Phòng ban mời" items={departments} selected={form.participant_department_ids} onToggle={(id) => toggle('participant_department_ids', id)} />
           <Selection title="Chức danh mời" items={positions} selected={form.participant_position_ids} onToggle={(id) => toggle('participant_position_ids', id)} />
           <Selection title="Khu phố mời" items={neighborhoods} selected={form.participant_neighborhood_ids} onToggle={(id) => toggle('participant_neighborhood_ids', id)} />
+
+          <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600">
+                <Users size={20} />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-indigo-900">Số lượng dự kiến tham gia</h4>
+                <p className="text-xs text-indigo-700/70 font-medium">Hệ thống tự động tính toán dựa trên cơ cấu khách mời</p>
+              </div>
+            </div>
+            <div className="text-2xl font-black text-indigo-700">
+              {getInvitedStaffCount()} <span className="text-sm font-semibold text-indigo-700/60">cán bộ</span>
+            </div>
+          </div>
 
           <div className="flex gap-3 justify-end pt-2 border-t border-gray-100">
             <button type="button" className="btn-secondary" onClick={() => setShowForm(false)}>Đóng</button>
@@ -242,9 +342,9 @@ export default function MeetingManagement() {
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="font-mono text-sm font-semibold">{formatTime(item.checkin_time)}</div>
-                  <span className={`badge ${item.status === 'present' ? 'badge-success' : 'badge-warning'} !text-[10px] !py-0.5 !px-2`}>
-                    {item.status === 'present' ? 'Đúng giờ' : 'Đi trễ'}
+                  <div className="font-mono text-sm font-semibold">{item.checkin_time ? formatTime(item.checkin_time) : '--:--'}</div>
+                  <span className={`badge ${item.status === 'present' ? 'badge-success' : item.status === 'late' ? 'badge-warning' : 'badge-danger'} !text-[10px] !py-0.5 !px-2`}>
+                    {item.status === 'present' ? 'Đúng giờ' : item.status === 'late' ? 'Đi trễ' : 'Vắng'}
                   </span>
                 </div>
               </div>
