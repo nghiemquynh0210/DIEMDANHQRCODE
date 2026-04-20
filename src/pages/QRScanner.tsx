@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { Camera, CameraOff, CheckCircle2, History, Search, Users, Zap } from 'lucide-react';
-import { Html5Qrcode } from 'html5-qrcode';
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { supabase } from '../lib/supabase';
 import { Attendance, Meeting } from '../types';
 import { formatTime } from '../lib/utils';
@@ -67,15 +67,19 @@ export default function QRScanner() {
   // ── Camera Scanner Logic ──
   const startCamera = async () => {
     try {
-      const scanner = new Html5Qrcode(scannerContainerId);
+      const scanner = new Html5Qrcode(scannerContainerId, {
+        formatsToSupport: [ Html5QrcodeSupportedFormats.QR_CODE ],
+        verbose: false
+      });
       scannerRef.current = scanner;
 
       await scanner.start(
         { facingMode: 'environment' }, // Camera sau
         {
-          fps: 10,
-          qrbox: { width: 250, height: 250 },
+          fps: 30,
+          qrbox: { width: 280, height: 280 },
           aspectRatio: 1.0,
+          disableFlip: false
         },
         async (decodedText) => {
           // Tránh xử lý nhiều lần cùng lúc

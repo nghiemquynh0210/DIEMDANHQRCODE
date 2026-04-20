@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Camera, CameraOff, CheckCircle2, AlertCircle, QrCode, Loader2 } from 'lucide-react';
-import { Html5Qrcode } from 'html5-qrcode';
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -85,12 +85,20 @@ export default function StaffQRScanner() {
     setStatus({ type: 'idle', message: '' });
     setFallbackMode(false);
     try {
-      const scanner = new Html5Qrcode(containerId);
+      const scanner = new Html5Qrcode(containerId, {
+        formatsToSupport: [ Html5QrcodeSupportedFormats.QR_CODE ],
+        verbose: false
+      });
       scannerRef.current = scanner;
 
       await scanner.start(
         { facingMode: 'environment' },
-        { fps: 10, qrbox: { width: 220, height: 220 }, aspectRatio: 1.0 },
+        { 
+          fps: 30, 
+          qrbox: { width: 280, height: 280 }, 
+          aspectRatio: 1.0,
+          disableFlip: false
+        },
         async (decodedText) => {
           await processQRText(decodedText);
         },
