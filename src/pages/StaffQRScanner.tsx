@@ -30,7 +30,7 @@ export default function StaffQRScanner() {
     const today = new Date().toISOString().split('T')[0];
     
     const { data: staffProfile } = await supabase.from('staff')
-      .select('department_id, position_id, party_department_id, party_position_id, school_department_id, school_position_id')
+      .select('department_id, position_id, party_department_id, party_position_id')
       .eq('id', staffId).single();
     if (!staffProfile) return;
 
@@ -48,10 +48,8 @@ export default function StaffQRScanner() {
       if (!depts.length && !positions.length) return true;
       return depts.includes(staffProfile.department_id) ||
              depts.includes(staffProfile.party_department_id) ||
-             depts.includes(staffProfile.school_department_id) ||
              positions.includes(staffProfile.position_id) ||
-             positions.includes(staffProfile.party_position_id) ||
-             positions.includes(staffProfile.school_position_id);
+             positions.includes(staffProfile.party_position_id);
     });
 
     const { data: attendanceData } = await supabase.from('attendance')

@@ -45,7 +45,7 @@ export default function MeetingManagement() {
         supabase.from('departments').select('*'),
         supabase.from('positions').select('*'),
         supabase.from('neighborhoods').select('*'),
-        supabase.from('staff').select('id, department_id, position_id, party_department_id, party_position_id, school_department_id, school_position_id, neighborhood_id, full_name, staff_code, departments:department_id(name), positions:position_id(name), party_departments:party_department_id(name), party_positions:party_position_id(name), school_departments:school_department_id(name), school_positions:school_position_id(name), neighborhoods(name)').eq('status', 'active'),
+        supabase.from('staff').select('id, department_id, position_id, party_department_id, party_position_id, full_name, staff_code, departments:department_id(name), positions:position_id(name), party_departments:party_department_id(name), party_positions:party_position_id(name)').eq('status', 'active'),
       ]);
       setMeetings(m || []);
       setDepartments(d || []);
@@ -165,10 +165,8 @@ export default function MeetingManagement() {
       invitedStaff = allStaff.filter(s => 
         (meeting.participant_department_ids || []).includes(s.department_id) ||
         (meeting.participant_department_ids || []).includes(s.party_department_id) ||
-        (meeting.participant_department_ids || []).includes(s.school_department_id) ||
         (meeting.participant_position_ids || []).includes(s.position_id) ||
-        (meeting.participant_position_ids || []).includes(s.party_position_id) ||
-        (meeting.participant_position_ids || []).includes(s.school_position_id)
+        (meeting.participant_position_ids || []).includes(s.party_position_id)
       );
     }
 

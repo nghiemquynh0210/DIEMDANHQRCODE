@@ -24,7 +24,7 @@ export default function QRScanner() {
   useEffect(() => {
     Promise.all([
       supabase.from('meetings').select('*').order('meeting_date', { ascending: false }).order('meeting_time', { ascending: false }),
-      supabase.from('staff').select('*, departments:department_id(name), positions:position_id(name), party_departments:party_department_id(name), party_positions:party_position_id(name), school_departments:school_department_id(name), school_positions:school_position_id(name)').order('full_name'),
+      supabase.from('staff').select('*, departments:department_id(name), positions:position_id(name), party_departments:party_department_id(name), party_positions:party_position_id(name)').order('full_name'),
     ]).then(([
       { data: meetingsData },
       { data: staffData }
@@ -36,8 +36,6 @@ export default function QRScanner() {
         position_name: item.positions?.name || null,
         party_department_name: item.party_departments?.name || null,
         party_position_name: item.party_positions?.name || null,
-        school_department_name: item.school_departments?.name || null,
-        school_position_name: item.school_positions?.name || null,
       }));
       setMeetings(m);
       setStaff(s);
@@ -67,10 +65,8 @@ export default function QRScanner() {
        invitedStaff = staff.filter(s => 
          (meeting.participant_department_ids || []).includes(s.department_id) ||
          (meeting.participant_department_ids || []).includes(s.party_department_id) ||
-         (meeting.participant_department_ids || []).includes(s.school_department_id) ||
          (meeting.participant_position_ids || []).includes(s.position_id) ||
-         (meeting.participant_position_ids || []).includes(s.party_position_id) ||
-         (meeting.participant_position_ids || []).includes(s.school_position_id)
+         (meeting.participant_position_ids || []).includes(s.party_position_id)
        );
     }
 

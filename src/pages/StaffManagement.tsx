@@ -26,7 +26,6 @@ export default function StaffManagement({
     staff_code: '', full_name: '',
     position_id: '', department_id: initialDepartmentId || '',
     party_position_id: '', party_department_id: '',
-    school_position_id: '', school_department_id: '',
     phone: '', email: '', status: 'active', notes: '',
   });
 
@@ -36,7 +35,7 @@ export default function StaffManagement({
         supabase.from('staff').select(`
           *, departments:department_id(name), positions:position_id(name),
           party_departments:party_department_id(name), party_positions:party_position_id(name),
-          school_departments:school_department_id(name), school_positions:school_position_id(name)
+          party_departments:party_department_id(name), party_positions:party_position_id(name)
         `).order('full_name'),
         supabase.from('departments').select('*').order('name'),
         supabase.from('positions').select('*').order('sort_order').order('name')
@@ -47,8 +46,6 @@ export default function StaffManagement({
         position_name: item.positions?.name || null,
         party_department_name: item.party_departments?.name || null,
         party_position_name: item.party_positions?.name || null,
-        school_department_name: item.school_departments?.name || null,
-        school_position_name: item.school_positions?.name || null,
       }));
       setStaff(mappedStaff);
       setDepartments(d || []);
@@ -65,19 +62,17 @@ export default function StaffManagement({
 
   const partyPositions = positions.filter(p => p.org_type === 'party');
   const govPositions = positions.filter(p => p.org_type === 'government');
-  const schoolPositions = positions.filter(p => p.org_type === 'school');
+
   const partyDepts = departments.filter(d => d.org_type === 'party');
   const govDepts = departments.filter(d => d.org_type === 'government');
-  const schoolDepts = departments.filter(d => d.org_type === 'school');
 
   const rows = useMemo(() => staff.filter((item) => {
     const q = searchTerm.toLowerCase();
     const hit = item.full_name.toLowerCase().includes(q) ||
       (item.staff_code || '').toLowerCase().includes(q) ||
       (item.position_name || '').toLowerCase().includes(q) ||
-      (item.party_position_name || '').toLowerCase().includes(q) ||
-      (item.school_position_name || '').toLowerCase().includes(q);
-    const okDept = selectedDept === 'all' || [item.department_id, item.party_department_id, item.school_department_id].map(String).includes(selectedDept);
+      (item.party_position_name || '').toLowerCase().includes(q);
+    const okDept = selectedDept === 'all' || [item.department_id, item.party_department_id].map(String).includes(selectedDept);
     return hit && okDept;
   }), [staff, searchTerm, selectedDept]);
 
@@ -85,7 +80,7 @@ export default function StaffManagement({
     setEditing(null);
     setForm({
       staff_code: '', full_name: '', position_id: '', department_id: initialDepartmentId || '',
-      party_position_id: '', party_department_id: '', school_position_id: '', school_department_id: '',
+      party_position_id: '', party_department_id: '',
       phone: '', email: '', status: 'active', notes: '',
     });
   };
@@ -98,8 +93,6 @@ export default function StaffManagement({
       position_id: form.position_id ? Number(form.position_id) : null,
       party_department_id: form.party_department_id ? Number(form.party_department_id) : null,
       party_position_id: form.party_position_id ? Number(form.party_position_id) : null,
-      school_department_id: form.school_department_id ? Number(form.school_department_id) : null,
-      school_position_id: form.school_position_id ? Number(form.school_position_id) : null,
       phone: form.phone || '', email: form.email || '',
       status: form.status || 'active', notes: form.notes || '',
     };
@@ -125,7 +118,6 @@ export default function StaffManagement({
       'Mã CB': item.staff_code || '', 'Họ tên': item.full_name,
       'CV Đảng': item.party_position_name || '', 'Chi bộ': item.party_department_name || '',
       'CV CQ': item.position_name || '', 'Phòng ban': item.department_name || '',
-      'CV Trường': item.school_position_name || '', 'Trường': item.school_department_name || '',
       'SĐT': item.phone,
     }));
     const ws = XLSX.utils.json_to_sheet(data);
@@ -152,8 +144,6 @@ export default function StaffManagement({
       department_id: item.department_id ? String(item.department_id) : '',
       party_position_id: item.party_position_id ? String(item.party_position_id) : '',
       party_department_id: item.party_department_id ? String(item.party_department_id) : '',
-      school_position_id: item.school_position_id ? String(item.school_position_id) : '',
-      school_department_id: item.school_department_id ? String(item.school_department_id) : '',
       phone: item.phone || '', email: item.email || '', status: item.status, notes: item.notes || '',
     });
     setShowForm(true);
@@ -172,7 +162,7 @@ export default function StaffManagement({
             <option value="all">Tất cả đơn vị</option>
             <optgroup label="🚩 Đảng ủy">{partyDepts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</optgroup>
             <optgroup label="🏢 Chính quyền">{govDepts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</optgroup>
-            <optgroup label="🎓 Nhà trường">{schoolDepts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</optgroup>
+
           </select>
           <div className="flex gap-3 ml-auto">
             <button className="btn-secondary" onClick={exportExcel}><FileSpreadsheet size={16} />Xuất Excel</button>
@@ -228,20 +218,6 @@ export default function StaffManagement({
             </div>
           </div>
 
-          {/* Nhà trường */}
-          <div className="mt-3 p-4 rounded-xl bg-emerald-50/50 border border-emerald-100">
-            <div className="flex items-center gap-2 mb-3"><GraduationCap size={14} className="text-emerald-500" /><span className="text-sm font-bold text-emerald-700">Nhà trường</span></div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <select className="input !bg-white" value={form.school_department_id} onChange={e => setForm({ ...form, school_department_id: e.target.value })}>
-                <option value="">-- Trường / Đơn vị GD --</option>
-                {schoolDepts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-              </select>
-              <select className="input !bg-white" value={form.school_position_id} onChange={e => setForm({ ...form, school_position_id: e.target.value })}>
-                <option value="">-- Chức vụ Nhà trường --</option>
-                {schoolPositions.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-            </div>
-          </div>
 
           {/* Trạng thái */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
@@ -264,7 +240,7 @@ export default function StaffManagement({
               <th>Nhân sự</th>
               <th>Đảng</th>
               <th>Chính quyền</th>
-              <th className="hidden lg:table-cell">Nhà trường</th>
+
               <th className="hidden sm:table-cell">Khu phố</th>
               <th className="text-right">Thao tác</th>
             </tr>
@@ -291,10 +267,7 @@ export default function StaffManagement({
                   <div className="text-sm">{item.position_name || <span className="text-brand-text/20">--</span>}</div>
                   <div className="text-[11px] text-brand-text/40">{item.department_name || ''}</div>
                 </td>
-                <td className="hidden lg:table-cell">
-                  <div className="text-sm">{item.school_position_name || <span className="text-brand-text/20">--</span>}</div>
-                  <div className="text-[11px] text-brand-text/40">{item.school_department_name || ''}</div>
-                </td>
+
                 <td className="hidden sm:table-cell"><div className="text-sm">{item.neighborhood_name || '--'}</div></td>
                 <td>
                   <div className="flex justify-end gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
