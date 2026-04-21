@@ -155,7 +155,22 @@ export default function SelfCheckin() {
                   <p style={{ fontSize: 12, color: '#6366F1', fontWeight: 600, marginBottom: 2 }}>Xin chào đồng chí</p>
                   {user?.position_name && (
                     <p style={{ fontSize: 14, color: '#4F46E5', fontWeight: 700, marginBottom: 2 }}>
-                      {user.position_name}{user.department_name ? ` ${user.department_name}` : ''}
+                      {(() => {
+                        // Remove org-type suffix from position if department starts with it
+                        // e.g. "Bí thư chi bộ" + "Chi bộ khu phố 3" → "Bí thư Chi bộ khu phố 3"
+                        const pos = user.position_name || '';
+                        const dept = user.department_name || '';
+                        if (!dept) return pos;
+                        const orgTypes = ['chi bộ', 'đảng ủy', 'chi ủy'];
+                        let shortPos = pos;
+                        for (const ot of orgTypes) {
+                          if (pos.toLowerCase().endsWith(` ${ot}`) && dept.toLowerCase().startsWith(ot)) {
+                            shortPos = pos.slice(0, pos.length - ot.length - 1);
+                            break;
+                          }
+                        }
+                        return `${shortPos} ${dept}`;
+                      })()}
                     </p>
                   )}
                   <p style={{ fontSize: 20, fontWeight: 800, color: '#1F2937', margin: 0 }}>{user?.username}</p>

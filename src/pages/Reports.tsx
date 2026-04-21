@@ -30,11 +30,11 @@ export default function Reports() {
 
         const { data: attData } = await supabase
           .from('attendance')
-          .select('*, staff(id, full_name, staff_code, departments(name), positions(name))')
+          .select('*, staff(id, full_name, staff_code, departments:department_id(name), positions:position_id(name))')
           .eq('meeting_id', selectedMeetingId)
           .order('checkin_time', { ascending: false });
 
-        let staffQuery = supabase.from('staff').select('id, full_name, staff_code, departments(name), positions(name)').eq('status', 'active');
+        let staffQuery = supabase.from('staff').select('id, full_name, staff_code, departments:department_id(name), positions:position_id(name)').eq('status', 'active');
         
         const orConditions = [];
         if (meeting.participant_department_ids?.length) {
