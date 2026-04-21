@@ -145,11 +145,11 @@ export default function QRScanner() {
                 if (alreadyChecked) {
                   setScanResult({ type: 'info', message: `${staffMatch.full_name} đã điểm danh rồi.` });
                 } else if (selectedMeetingId) {
-                  const { error } = await supabase.from('attendance').insert({
+                  const { error } = await supabase.from('attendance').upsert({
                     meeting_id: Number(selectedMeetingId),
                     staff_id: staffMatch.id,
                     checkin_method: 'qr',
-                  });
+                  }, { onConflict: 'meeting_id,staff_id' });
 
                   if (!error) {
                     setScanResult({ type: 'success', message: `✅ ${staffMatch.full_name} - Điểm danh thành công!` });
@@ -203,14 +203,14 @@ export default function QRScanner() {
     const alreadyChecked = attendance.some(a => String(a.staff_id) === String(staffId) && a.status !== 'absent');
     if (alreadyChecked) return;
 
-    const { error } = await supabase.from('attendance').insert({
+    const { error } = await supabase.from('attendance').upsert({
       meeting_id: Number(selectedMeetingId),
       staff_id: staffId,
       checkin_method: 'manual',
-    });
+    }, { onConflict: 'meeting_id,staff_id' });
 
     if (error) {
-      alert(error.message || 'Không thể điểm danh.');
+      setScanResult({ type: 'error', message: error.message || 'Không thể điểm danh.' });
       return;
     }
     
@@ -221,13 +221,12 @@ export default function QRScanner() {
 
   const cancelCheckin = async (staffId: number) => {
     if (!selectedMeetingId) return;
-    if (!confirm('Bạn có chắc muốn hủy điểm danh của nhân sự này?')) return;
     const { error } = await supabase.from('attendance')
       .delete()
       .eq('meeting_id', selectedMeetingId)
       .eq('staff_id', staffId);
     if (error) {
-      alert(error.message || 'Không thể hủy điểm danh.');
+      setScanResult({ type: 'error', message: error.message || 'Không thể hủy điểm danh.' });
       return;
     }
     await refreshAttendance();
