@@ -24,7 +24,7 @@ export default function QRScanner() {
   useEffect(() => {
     Promise.all([
       supabase.from('meetings').select('*').order('meeting_date', { ascending: false }).order('meeting_time', { ascending: false }),
-      supabase.from('staff').select('*, departments(name), positions(name), neighborhoods(name)').order('full_name'),
+      supabase.from('staff').select('*, departments:department_id(name), positions:position_id(name), party_departments:party_department_id(name), party_positions:party_position_id(name), neighborhoods(name)').order('full_name'),
     ]).then(([
       { data: meetingsData },
       { data: staffData }
@@ -34,6 +34,8 @@ export default function QRScanner() {
         ...item,
         department_name: item.departments?.name || null,
         position_name: item.positions?.name || null,
+        party_department_name: item.party_departments?.name || null,
+        party_position_name: item.party_positions?.name || null,
         neighborhood_name: item.neighborhoods?.name || null,
       }));
       setMeetings(m);
@@ -64,7 +66,9 @@ export default function QRScanner() {
     if (meeting && (meeting.participant_department_ids?.length || meeting.participant_position_ids?.length || meeting.participant_neighborhood_ids?.length)) {
        invitedStaff = staff.filter(s => 
          (meeting.participant_department_ids || []).includes(s.department_id) ||
+         (meeting.participant_department_ids || []).includes(s.party_department_id) ||
          (meeting.participant_position_ids || []).includes(s.position_id) ||
+         (meeting.participant_position_ids || []).includes(s.party_position_id) ||
          (meeting.participant_neighborhood_ids || []).includes(s.neighborhood_id)
        );
     }

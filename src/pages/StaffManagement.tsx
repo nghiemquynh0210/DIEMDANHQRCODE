@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Edit2, FileSpreadsheet, Plus, QrCode as QrIcon, Search, Trash2, X, UserCircle } from 'lucide-react';
+import { Edit2, FileSpreadsheet, Flag, Landmark, Plus, QrCode as QrIcon, Search, Trash2, X } from 'lucide-react';
 import QRCode from 'qrcode';
 import * as XLSX from 'xlsx';
 import { supabase } from '../lib/supabase';
@@ -31,14 +31,14 @@ export default function StaffManagement({
     full_name: '',
     position_id: '',
     department_id: initialDepartmentId || '',
+    party_position_id: '',
+    party_department_id: '',
     neighborhood_id: initialNeighborhoodId || '',
     phone: '',
     email: '',
     status: 'active',
     notes: '',
   });
-
-  const token = localStorage.getItem('token');
 
   const load = async () => {
     try {
@@ -48,16 +48,25 @@ export default function StaffManagement({
         { data: p },
         { data: n }
       ] = await Promise.all([
-        supabase.from('staff').select('*, departments(name), positions(name), neighborhoods(name)').order('full_name'),
-        supabase.from('departments').select('*'),
-        supabase.from('positions').select('*'),
-        supabase.from('neighborhoods').select('*'),
+        supabase.from('staff').select(`
+          *,
+          departments:department_id(name),
+          positions:position_id(name),
+          party_departments:party_department_id(name),
+          party_positions:party_position_id(name),
+          neighborhoods(name)
+        `).order('full_name'),
+        supabase.from('departments').select('*').order('name'),
+        supabase.from('positions').select('*').order('sort_order').order('name'),
+        supabase.from('neighborhoods').select('*').order('name'),
       ]);
 
       const mappedStaff = (s || []).map((item: any) => ({
         ...item,
         department_name: item.departments?.name || null,
         position_name: item.positions?.name || null,
+        party_department_name: item.party_departments?.name || null,
+        party_position_name: item.party_positions?.name || null,
         neighborhood_name: item.neighborhoods?.name || null,
       }));
 
@@ -78,10 +87,18 @@ export default function StaffManagement({
     }
   }, [autoOpenAdd, onClearParams]);
 
+  const partyPositions = positions.filter(p => p.org_type === 'party');
+  const govPositions = positions.filter(p => p.org_type === 'government');
+  const partyDepts = departments.filter(d => d.org_type === 'party');
+  const govDepts = departments.filter(d => d.org_type === 'government');
+
   const rows = useMemo(() => staff.filter((item) => {
     const q = searchTerm.toLowerCase();
-    const hit = item.full_name.toLowerCase().includes(q) || (item.staff_code || '').toLowerCase().includes(q) || (item.position_name || '').toLowerCase().includes(q);
-    const okDept = selectedDept === 'all' || String(item.department_id || '') === selectedDept;
+    const hit = item.full_name.toLowerCase().includes(q) ||
+      (item.staff_code || '').toLowerCase().includes(q) ||
+      (item.position_name || '').toLowerCase().includes(q) ||
+      (item.party_position_name || '').toLowerCase().includes(q);
+    const okDept = selectedDept === 'all' || String(item.department_id || '') === selectedDept || String(item.party_department_id || '') === selectedDept;
     const okNeighborhood = selectedNeighborhood === 'all' || String(item.neighborhood_id || '') === selectedNeighborhood;
     return hit && okDept && okNeighborhood;
   }), [staff, searchTerm, selectedDept, selectedNeighborhood]);
@@ -89,15 +106,9 @@ export default function StaffManagement({
   const reset = () => {
     setEditing(null);
     setForm({
-      staff_code: '',
-      full_name: '',
-      position_id: '',
-      department_id: initialDepartmentId || '',
-      neighborhood_id: initialNeighborhoodId || '',
-      phone: '',
-      email: '',
-      status: 'active',
-      notes: '',
+      staff_code: '', full_name: '', position_id: '', department_id: initialDepartmentId || '',
+      party_position_id: '', party_department_id: '',
+      neighborhood_id: initialNeighborhoodId || '', phone: '', email: '', status: 'active', notes: '',
     });
   };
 
@@ -108,6 +119,8 @@ export default function StaffManagement({
       full_name: form.full_name,
       department_id: form.department_id ? Number(form.department_id) : null,
       position_id: form.position_id ? Number(form.position_id) : null,
+      party_department_id: form.party_department_id ? Number(form.party_department_id) : null,
+      party_position_id: form.party_position_id ? Number(form.party_position_id) : null,
       neighborhood_id: form.neighborhood_id ? Number(form.neighborhood_id) : null,
       phone: form.phone || '',
       email: form.email || '',
@@ -120,13 +133,13 @@ export default function StaffManagement({
     } else {
       await supabase.from('staff').insert(payload);
     }
-    
     setShowForm(false);
     reset();
     load();
   };
 
   const remove = async (id: number) => {
+    if (!confirm('Xác nhận xóa?')) return;
     await supabase.from('users').delete().eq('staff_id', id);
     await supabase.from('staff').delete().eq('id', id);
     load();
@@ -141,10 +154,12 @@ export default function StaffManagement({
     const data = rows.map((item) => ({
       'Mã cán bộ': item.staff_code || '',
       'Họ và tên': item.full_name,
-      'Chức danh': item.position_name || '',
+      'CV Đảng': item.party_position_name || '',
+      'Chi bộ': item.party_department_name || '',
+      'CV Chính quyền': item.position_name || '',
       'Phòng ban': item.department_name || '',
       'Khu phố': item.neighborhood_name || '',
-      'Số điện thoại': item.phone,
+      'SĐT': item.phone,
       Email: item.email,
     }));
     const ws = XLSX.utils.json_to_sheet(data);
@@ -159,13 +174,23 @@ export default function StaffManagement({
   };
 
   const avatarColors = [
-    'from-indigo-500 to-purple-500',
-    'from-cyan-500 to-blue-500',
-    'from-emerald-500 to-teal-500',
-    'from-amber-500 to-orange-500',
-    'from-pink-500 to-rose-500',
-    'from-violet-500 to-fuchsia-500',
+    'from-indigo-500 to-purple-500', 'from-cyan-500 to-blue-500', 'from-emerald-500 to-teal-500',
+    'from-amber-500 to-orange-500', 'from-pink-500 to-rose-500', 'from-violet-500 to-fuchsia-500',
   ];
+
+  const startEdit = (item: Staff) => {
+    setEditing(item);
+    setForm({
+      staff_code: item.staff_code || '', full_name: item.full_name,
+      position_id: item.position_id ? String(item.position_id) : '',
+      department_id: item.department_id ? String(item.department_id) : '',
+      party_position_id: item.party_position_id ? String(item.party_position_id) : '',
+      party_department_id: item.party_department_id ? String(item.party_department_id) : '',
+      neighborhood_id: item.neighborhood_id ? String(item.neighborhood_id) : '',
+      phone: item.phone, email: item.email, status: item.status, notes: item.notes || '',
+    });
+    setShowForm(true);
+  };
 
   return (
     <div className="space-y-6">
@@ -173,16 +198,21 @@ export default function StaffManagement({
       <div className="space-y-3">
         <div className="relative group">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-text/30 group-focus-within:text-primary transition-colors" size={18} />
-          <input className="input pl-12 w-full" placeholder="Tìm tên, mã cán bộ, chức danh..." value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} />
+          <input className="input pl-12 w-full" placeholder="Tìm tên, mã, chức vụ Đảng/CQ..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <select className="input w-full sm:w-48 min-w-0" value={selectedDept} onChange={(event) => setSelectedDept(event.target.value)}>
-            <option value="all">Tất cả phòng ban</option>
-            {departments.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+          <select className="input w-full sm:w-48 min-w-0" value={selectedDept} onChange={(e) => setSelectedDept(e.target.value)}>
+            <option value="all">Tất cả đơn vị</option>
+            <optgroup label="🚩 Đảng ủy">
+              {partyDepts.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+            </optgroup>
+            <optgroup label="🏢 Chính quyền">
+              {govDepts.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+            </optgroup>
           </select>
-          <select className="input w-full sm:w-48 min-w-0" value={selectedNeighborhood} onChange={(event) => setSelectedNeighborhood(event.target.value)}>
+          <select className="input w-full sm:w-48 min-w-0" value={selectedNeighborhood} onChange={(e) => setSelectedNeighborhood(e.target.value)}>
             <option value="all">Tất cả khu phố</option>
-            {neighborhoods.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+            {neighborhoods.map((n) => <option key={n.id} value={n.id}>{n.name}</option>)}
           </select>
           <div className="flex gap-3 ml-auto">
             <button className="btn-secondary" onClick={exportExcel}><FileSpreadsheet size={16} />Xuất Excel</button>
@@ -191,7 +221,6 @@ export default function StaffManagement({
         </div>
       </div>
 
-      {/* Result count */}
       <p className="text-xs font-medium text-brand-text/40">{rows.length} nhân sự</p>
 
       {/* Form */}
@@ -203,29 +232,63 @@ export default function StaffManagement({
               <X size={18} className="text-brand-text/40" />
             </button>
           </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <input className="input" placeholder="Mã cán bộ" value={form.staff_code} onChange={(event) => setForm({ ...form, staff_code: event.target.value })} />
-            <input className="input" placeholder="Họ và tên" value={form.full_name} onChange={(event) => setForm({ ...form, full_name: event.target.value })} required />
-            <select className="input" value={form.position_id} onChange={(event) => setForm({ ...form, position_id: event.target.value })}>
-              <option value="">Chọn chức danh</option>
-              {positions.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-            </select>
-            <select className="input" value={form.department_id} onChange={(event) => setForm({ ...form, department_id: event.target.value })}>
-              <option value="">Chọn phòng ban</option>
-              {departments.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-            </select>
-            <select className="input" value={form.neighborhood_id} onChange={(event) => setForm({ ...form, neighborhood_id: event.target.value })}>
+            <input className="input" placeholder="Mã cán bộ" value={form.staff_code} onChange={(e) => setForm({ ...form, staff_code: e.target.value })} />
+            <input className="input" placeholder="Họ và tên" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} required />
+            <input className="input" placeholder="Số điện thoại" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+            <input className="input" placeholder="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+          </div>
+
+          {/* Đảng Section */}
+          <div className="mt-4 p-4 rounded-xl bg-red-50/50 border border-red-100">
+            <div className="flex items-center gap-2 mb-3">
+              <Flag size={14} className="text-red-500" />
+              <span className="text-sm font-bold text-red-700">Đảng ủy</span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <select className="input !bg-white" value={form.party_department_id} onChange={(e) => setForm({ ...form, party_department_id: e.target.value })}>
+                <option value="">-- Chi bộ / Đơn vị Đảng --</option>
+                {partyDepts.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+              </select>
+              <select className="input !bg-white" value={form.party_position_id} onChange={(e) => setForm({ ...form, party_position_id: e.target.value })}>
+                <option value="">-- Chức vụ Đảng --</option>
+                {partyPositions.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {/* Chính quyền Section */}
+          <div className="mt-3 p-4 rounded-xl bg-indigo-50/50 border border-indigo-100">
+            <div className="flex items-center gap-2 mb-3">
+              <Landmark size={14} className="text-indigo-500" />
+              <span className="text-sm font-bold text-indigo-700">Chính quyền (UBND)</span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <select className="input !bg-white" value={form.department_id} onChange={(e) => setForm({ ...form, department_id: e.target.value })}>
+                <option value="">-- Phòng ban / Đơn vị CQ --</option>
+                {govDepts.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+              </select>
+              <select className="input !bg-white" value={form.position_id} onChange={(e) => setForm({ ...form, position_id: e.target.value })}>
+                <option value="">-- Chức vụ CQ --</option>
+                {govPositions.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {/* Khu phố + Trạng thái */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+            <select className="input" value={form.neighborhood_id} onChange={(e) => setForm({ ...form, neighborhood_id: e.target.value })}>
               <option value="">Chọn khu phố</option>
-              {neighborhoods.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+              {neighborhoods.map((n) => <option key={n.id} value={n.id}>{n.name}</option>)}
             </select>
-            <input className="input" placeholder="Số điện thoại" value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} />
-            <input className="input" placeholder="Email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />
-            <select className="input" value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })}>
+            <select className="input" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
               <option value="active">Đang hoạt động</option>
               <option value="inactive">Ngừng sử dụng</option>
             </select>
-            <textarea className="input md:col-span-2 min-h-[80px]" placeholder="Ghi chú" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
+            <textarea className="input md:col-span-2 min-h-[80px]" placeholder="Ghi chú" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
           </div>
+
           <div className="flex gap-3 justify-end mt-5 pt-4 border-t border-gray-100">
             <button type="button" className="btn-secondary" onClick={() => setShowForm(false)}>Đóng</button>
             <button className="btn-primary">{editing ? 'Lưu thay đổi' : 'Thêm mới'}</button>
@@ -239,9 +302,9 @@ export default function StaffManagement({
           <thead>
             <tr>
               <th>Nhân sự</th>
-              <th>Cơ cấu</th>
-              <th className="hidden md:table-cell">Liên hệ</th>
-              <th className="hidden sm:table-cell">Trạng thái</th>
+              <th>Đảng</th>
+              <th>Chính quyền</th>
+              <th className="hidden sm:table-cell">Khu phố</th>
               <th className="text-right">Thao tác</th>
             </tr>
           </thead>
@@ -260,24 +323,22 @@ export default function StaffManagement({
                   </div>
                 </td>
                 <td>
-                  <div className="text-sm">{item.position_name || '--'}</div>
-                  <div className="text-[11px] text-brand-text/40">{item.department_name || '--'} / {item.neighborhood_name || '--'}</div>
+                  <div className="text-sm">{item.party_position_name || <span className="text-brand-text/20">--</span>}</div>
+                  <div className="text-[11px] text-brand-text/40">{item.party_department_name || ''}</div>
                 </td>
-                <td className="hidden md:table-cell">
-                  <div className="text-sm">{item.phone || '--'}</div>
-                  <div className="text-[11px] text-brand-text/40">{item.email || '--'}</div>
+                <td>
+                  <div className="text-sm">{item.position_name || <span className="text-brand-text/20">--</span>}</div>
+                  <div className="text-[11px] text-brand-text/40">{item.department_name || ''}</div>
                 </td>
                 <td className="hidden sm:table-cell">
-                  <span className={`badge ${item.status === 'active' ? 'badge-success' : 'badge-danger'}`}>
-                    {item.status === 'active' ? 'Hoạt động' : 'Ngừng'}
-                  </span>
+                  <div className="text-sm">{item.neighborhood_name || '--'}</div>
                 </td>
                 <td>
                   <div className="flex justify-end gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
                     <button className="p-2 hover:bg-indigo-50 rounded-lg transition-colors" onClick={() => showQr(item)} title="QR Code">
                       <QrIcon size={15} className="text-brand-text/50" />
                     </button>
-                    <button className="p-2 hover:bg-indigo-50 rounded-lg transition-colors" title="Chỉnh sửa" onClick={() => { setEditing(item); setForm({ staff_code: item.staff_code || '', full_name: item.full_name, position_id: item.position_id ? String(item.position_id) : '', department_id: item.department_id ? String(item.department_id) : '', neighborhood_id: item.neighborhood_id ? String(item.neighborhood_id) : '', phone: item.phone, email: item.email, status: item.status, notes: item.notes || '' }); setShowForm(true); }}>
+                    <button className="p-2 hover:bg-indigo-50 rounded-lg transition-colors" title="Chỉnh sửa" onClick={() => startEdit(item)}>
                       <Edit2 size={15} className="text-brand-text/50" />
                     </button>
                     <button className="p-2 hover:bg-red-50 rounded-lg transition-colors" onClick={() => remove(item.id)} title="Xóa">

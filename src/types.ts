@@ -2,6 +2,7 @@ export interface Department {
   id: number;
   name: string;
   description: string;
+  org_type: 'party' | 'government';
   created_at: string;
 }
 
@@ -10,6 +11,7 @@ export interface Position {
   name: string;
   code?: string;
   description?: string;
+  org_type: 'party' | 'government';
   sort_order?: number;
   created_at: string;
 }
@@ -30,6 +32,10 @@ export interface Staff {
   position_name?: string | null;
   department_id?: number | null;
   department_name?: string | null;
+  party_position_id?: number | null;
+  party_position_name?: string | null;
+  party_department_id?: number | null;
+  party_department_name?: string | null;
   neighborhood_id?: number | null;
   neighborhood_name?: string | null;
   phone: string;
@@ -44,6 +50,7 @@ export interface Meeting {
   id: number;
   title: string;
   content: string;
+  org_type: 'party' | 'government' | 'all';
   participant_department_ids: number[];
   participant_position_ids: number[];
   participant_neighborhood_ids: number[];
@@ -75,3 +82,4 @@ export interface User {
   role: 'admin' | 'staff' | 'viewer';
   staff_id?: number | null;
 }
+
