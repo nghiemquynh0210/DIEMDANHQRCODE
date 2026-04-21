@@ -170,24 +170,24 @@ export default function StaffManagement({
   return (
     <div className="space-y-6">
       {/* Toolbar */}
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-        <div className="flex flex-col md:flex-row gap-3 flex-1">
-          <div className="relative flex-1 max-w-xl group">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-text/30 group-focus-within:text-primary transition-colors" size={18} />
-            <input className="input pl-12" placeholder="Tìm tên, mã cán bộ, chức danh..." value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} />
-          </div>
-          <select className="input md:w-48" value={selectedDept} onChange={(event) => setSelectedDept(event.target.value)}>
+      <div className="space-y-3">
+        <div className="relative group">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-text/30 group-focus-within:text-primary transition-colors" size={18} />
+          <input className="input pl-12 w-full" placeholder="Tìm tên, mã cán bộ, chức danh..." value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} />
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <select className="input w-full sm:w-48 min-w-0" value={selectedDept} onChange={(event) => setSelectedDept(event.target.value)}>
             <option value="all">Tất cả phòng ban</option>
             {departments.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
           </select>
-          <select className="input md:w-48" value={selectedNeighborhood} onChange={(event) => setSelectedNeighborhood(event.target.value)}>
+          <select className="input w-full sm:w-48 min-w-0" value={selectedNeighborhood} onChange={(event) => setSelectedNeighborhood(event.target.value)}>
             <option value="all">Tất cả khu phố</option>
             {neighborhoods.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
           </select>
-        </div>
-        <div className="flex gap-3">
-          <button className="btn-secondary" onClick={exportExcel}><FileSpreadsheet size={16} />Xuất Excel</button>
-          <button className="btn-primary" onClick={() => { reset(); setShowForm(true); }}><Plus size={16} />Thêm nhân sự</button>
+          <div className="flex gap-3 ml-auto">
+            <button className="btn-secondary" onClick={exportExcel}><FileSpreadsheet size={16} />Xuất Excel</button>
+            <button className="btn-primary" onClick={() => { reset(); setShowForm(true); }}><Plus size={16} />Thêm nhân sự</button>
+          </div>
         </div>
       </div>
 
