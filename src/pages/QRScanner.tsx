@@ -47,7 +47,7 @@ export default function QRScanner() {
   const refreshAttendance = useCallback(async () => {
     if (!selectedMeetingId) return;
     const { data } = await supabase.from('attendance')
-      .select('*, staff!inner(full_name, staff_code, departments:department_id(name), positions:position_id(name))')
+      .select('*, staff!inner(full_name, staff_code, departments:department_id(name), positions:position_id(name), party_departments:party_department_id(name), party_positions:party_position_id(name))')
       .eq('meeting_id', selectedMeetingId)
       .order('checkin_time', { ascending: false });
       
@@ -55,8 +55,8 @@ export default function QRScanner() {
       ...item,
       full_name: item.staff?.full_name || '--',
       staff_code: item.staff?.staff_code || '--',
-      position_name: item.staff?.positions?.name || '--',
-      department_name: item.staff?.departments?.name || '--',
+      position_name: item.staff?.positions?.name || item.staff?.party_positions?.name || '--',
+      department_name: item.staff?.departments?.name || item.staff?.party_departments?.name || '--',
     }));
 
     const meeting = meetings.find(m => String(m.id) === String(selectedMeetingId));

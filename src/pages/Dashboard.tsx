@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { Building2, CalendarDays, Shapes, Users, TrendingUp, Clock, MapPin, FileText } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 
 export default function Dashboard() {
   const [stats, setStats] = useState<any>(null);
+  const location = useLocation();
 
   useEffect(() => {
     async function fetchStats() {
@@ -67,7 +69,7 @@ export default function Dashboard() {
     }
 
     fetchStats();
-  }, []);
+  }, [location.key]);
 
   if (!stats) {
     return (
