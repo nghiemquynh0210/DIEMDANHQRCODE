@@ -67,7 +67,13 @@ export default function DepartmentManagement({
 
   const remove = async (table: string, id: number) => {
     if (!confirm('Xác nhận xóa?')) return;
-    await supabase.from(table).delete().eq('id', id);
+    const { error } = await supabase.from(table).delete().eq('id', id);
+    if (error) {
+      console.error(error);
+      if (error.code === '23503') alert('Không thể xóa vì đang có nhân sự sử dụng dữ liệu này!');
+      else alert('Lỗi khi xóa: ' + error.message);
+      return;
+    }
     load();
   };
 
@@ -83,7 +89,12 @@ export default function DepartmentManagement({
 
   const saveEdit = async () => {
     if (!editingId || !editingName.trim()) return;
-    await supabase.from(editingId.table).update({ name: editingName.trim() }).eq('id', editingId.id);
+    const { error } = await supabase.from(editingId.table).update({ name: editingName.trim() }).eq('id', editingId.id);
+    if (error) {
+      console.error(error);
+      alert('Lỗi khi lưu: ' + error.message);
+      return;
+    }
     cancelEdit();
     load();
   };
