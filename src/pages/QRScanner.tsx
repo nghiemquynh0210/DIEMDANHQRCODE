@@ -298,7 +298,7 @@ export default function QRScanner() {
 
         <div className="flex-1 space-y-2 overflow-y-auto pr-1">
           {filteredStaff.map((item) => {
-            const checked = attendance.some((row) => row.staff_id === item.id);
+            const checked = attendance.some((row) => row.staff_id === item.id && row.status !== 'absent');
             const justChecked = flashId === item.id;
             return (
               <div
