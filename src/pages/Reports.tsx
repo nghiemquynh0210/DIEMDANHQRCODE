@@ -30,18 +30,20 @@ export default function Reports() {
 
         const { data: attData } = await supabase
           .from('attendance')
-          .select('*, staff(id, full_name, staff_code, departments:department_id(name), positions:position_id(name))')
+          .select('*, staff(id, full_name, staff_code, departments:department_id(name), positions:position_id(name), party_departments:party_department_id(name), party_positions:party_position_id(name))')
           .eq('meeting_id', selectedMeetingId)
           .order('checkin_time', { ascending: false });
 
-        let staffQuery = supabase.from('staff').select('id, full_name, staff_code, departments:department_id(name), positions:position_id(name)').eq('status', 'active');
+        let staffQuery = supabase.from('staff').select('id, full_name, staff_code, department_id, position_id, party_department_id, party_position_id, departments:department_id(name), positions:position_id(name), party_departments:party_department_id(name), party_positions:party_position_id(name)').eq('status', 'active');
         
         const orConditions = [];
         if (meeting.participant_department_ids?.length) {
             orConditions.push(`department_id.in.(${meeting.participant_department_ids.join(',')})`);
+            orConditions.push(`party_department_id.in.(${meeting.participant_department_ids.join(',')})`);
         }
         if (meeting.participant_position_ids?.length) {
             orConditions.push(`position_id.in.(${meeting.participant_position_ids.join(',')})`);
+            orConditions.push(`party_position_id.in.(${meeting.participant_position_ids.join(',')})`);
         }
         
         if (orConditions.length > 0) {
@@ -56,8 +58,8 @@ export default function Reports() {
           ...item,
           full_name: item.staff?.full_name || '--',
           staff_code: item.staff?.staff_code || '--',
-          department_name: item.staff?.departments?.name || '--',
-          position_name: item.staff?.positions?.name || '--',
+          department_name: item.staff?.departments?.name || item.staff?.party_departments?.name || '--',
+          position_name: item.staff?.positions?.name || item.staff?.party_positions?.name || '--',
         }));
 
         const absentStaff = (staffData || []).filter(s => !attendedStaffIds.has(s.id));
@@ -71,8 +73,8 @@ export default function Reports() {
             status: 'absent',
             full_name: s.full_name || '--',
             staff_code: s.staff_code || '--',
-            department_name: s.departments?.name || '--',
-            position_name: s.positions?.name || '--',
+            department_name: s.departments?.name || s.party_departments?.name || '--',
+            position_name: s.positions?.name || s.party_positions?.name || '--',
         }));
 
         setAttendance([...mappedAttendance, ...mappedAbsent]);
