@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Building2, Check, Flag, GraduationCap, Landmark, MapPinned, Pencil, Plus, Shapes, Trash2, Users, X } from 'lucide-react';
+import { Building2, Check, Flag, Landmark, Pencil, Plus, Shapes, Trash2, Users, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Department, Position } from '../types';
 
@@ -14,7 +14,7 @@ const TAB_CONFIG = {
 export default function DepartmentManagement({
   onNavigateToStaff,
 }: {
-  onNavigateToStaff: (filters?: { departmentId?: string; neighborhoodId?: string; triggerAdd?: boolean }) => void;
+  onNavigateToStaff: (filters?: { departmentId?: string; triggerAdd?: boolean }) => void;
 }) {
   const [activeTab, setActiveTab] = useState<OrgTab>('party');
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -67,11 +67,9 @@ export default function DepartmentManagement({
            if (table === 'positions') {
              await supabase.from('staff').update({ position_id: null }).eq('position_id', id);
              await supabase.from('staff').update({ party_position_id: null }).eq('party_position_id', id);
-             await supabase.from('staff').update({ school_position_id: null }).eq('school_position_id', id);
            } else if (table === 'departments') {
              await supabase.from('staff').update({ department_id: null }).eq('department_id', id);
              await supabase.from('staff').update({ party_department_id: null }).eq('party_department_id', id);
-             await supabase.from('staff').update({ school_department_id: null }).eq('school_department_id', id);
            }
            const { error: finalErr } = await supabase.from(table).delete().eq('id', id);
            if (finalErr) { alert('Vẫn báo lỗi sau khi gỡ: ' + finalErr.message); return; }

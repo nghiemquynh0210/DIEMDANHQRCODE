@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Edit2, FileSpreadsheet, Flag, GraduationCap, Landmark, Plus, QrCode as QrIcon, Search, Trash2, X } from 'lucide-react';
+import { Edit2, FileSpreadsheet, Flag, Landmark, Plus, QrCode as QrIcon, Search, Trash2, X } from 'lucide-react';
 import QRCode from 'qrcode';
 import * as XLSX from 'xlsx';
 import { supabase } from '../lib/supabase';
@@ -34,7 +34,6 @@ export default function StaffManagement({
       const [{ data: s }, { data: d }, { data: p }] = await Promise.all([
         supabase.from('staff').select(`
           *, departments:department_id(name), positions:position_id(name),
-          party_departments:party_department_id(name), party_positions:party_position_id(name),
           party_departments:party_department_id(name), party_positions:party_position_id(name)
         `).order('full_name'),
         supabase.from('departments').select('*').order('name'),
@@ -241,7 +240,7 @@ export default function StaffManagement({
               <th>Đảng</th>
               <th>Chính quyền</th>
 
-              <th className="hidden sm:table-cell">Khu phố</th>
+
               <th className="text-right">Thao tác</th>
             </tr>
           </thead>
@@ -268,7 +267,7 @@ export default function StaffManagement({
                   <div className="text-[11px] text-brand-text/40">{item.department_name || ''}</div>
                 </td>
 
-                <td className="hidden sm:table-cell"><div className="text-sm">{item.neighborhood_name || '--'}</div></td>
+
                 <td>
                   <div className="flex justify-end gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
                     <button className="p-2 hover:bg-indigo-50 rounded-lg" onClick={() => showQr(item)} title="QR"><QrIcon size={15} className="text-brand-text/50" /></button>

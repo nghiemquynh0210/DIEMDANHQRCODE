@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Calendar, Clock, Edit2, Flag, GraduationCap, Landmark, MapPin, Plus, QrCode, Trash2, Users, X, ChevronDown, ChevronUp } from 'lucide-react';
+import { Calendar, Clock, Edit2, Flag, Landmark, MapPin, Plus, QrCode, Trash2, Users, X, ChevronDown, ChevronUp } from 'lucide-react';
 import QRCode from 'qrcode';
 import { supabase } from '../lib/supabase';
 import { Department, Meeting, Position } from '../types';
@@ -38,13 +38,11 @@ export default function MeetingManagement() {
         { data: m },
         { data: d },
         { data: p },
-        { data: n },
         { data: s }
       ] = await Promise.all([
         supabase.from('meetings').select('*').order('meeting_date', { ascending: false }).order('meeting_time', { ascending: false }),
         supabase.from('departments').select('*'),
         supabase.from('positions').select('*'),
-        supabase.from('neighborhoods').select('*'),
         supabase.from('staff').select('id, department_id, position_id, party_department_id, party_position_id, full_name, staff_code, departments:department_id(name), positions:position_id(name), party_departments:party_department_id(name), party_positions:party_position_id(name)').eq('status', 'active'),
       ]);
       setMeetings(m || []);
@@ -58,7 +56,7 @@ export default function MeetingManagement() {
 
   useEffect(() => { load(); }, []);
 
-  const toggle = (key: 'participant_department_ids' | 'participant_position_ids' | 'participant_neighborhood_ids', id: number) => {
+  const toggle = (key: 'participant_department_ids' | 'participant_position_ids', id: number) => {
     if (key === 'participant_position_ids') {
       const clickedPos = positions.find(p => p.id === id);
       if (clickedPos) {
@@ -156,7 +154,7 @@ export default function MeetingManagement() {
     setSelectedMeetingForAttendance(meeting);
     const { data } = await supabase
       .from('attendance')
-      .select('*, staff(full_name, staff_code, departments(name), positions(name), neighborhoods(name))')
+      .select('*, staff(full_name, staff_code, departments(name), positions(name))')
       .eq('meeting_id', meeting.id)
       .order('checkin_time', { ascending: false });
 
@@ -191,7 +189,6 @@ export default function MeetingManagement() {
       staff_code: s.staff_code || '--',
       department_name: s.departments?.name || '--',
       position_name: s.positions?.name || '--',
-      neighborhood_name: s.neighborhoods?.name || '--',
     }));
 
     setAttendance([...mappedAttendance, ...mappedAbsent]);
@@ -228,17 +225,14 @@ export default function MeetingManagement() {
   };
 
   const getInvitedStaffCount = () => {
-     if (isAllStaff || (form.participant_department_ids.length === 0 && form.participant_position_ids.length === 0 && form.participant_neighborhood_ids.length === 0)) {
+     if (isAllStaff || (form.participant_department_ids.length === 0 && form.participant_position_ids.length === 0)) {
         return allStaff.length;
      }
      return allStaff.filter(s => 
         form.participant_department_ids.includes(s.department_id) || 
         form.participant_department_ids.includes(s.party_department_id) ||
-        form.participant_department_ids.includes(s.school_department_id) ||
         form.participant_position_ids.includes(s.position_id) || 
-        form.participant_position_ids.includes(s.party_position_id) ||
-        form.participant_position_ids.includes(s.school_position_id) ||
-        form.participant_neighborhood_ids.includes(s.neighborhood_id)
+        form.participant_position_ids.includes(s.party_position_id)
      ).length;
   };
 
@@ -369,7 +363,7 @@ export default function MeetingManagement() {
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <h3 className="text-base font-bold text-brand-text">{item.title}</h3>
-                  <span className={`badge !text-[10px] !py-0.5 !px-2 ${item.org_type === 'party' ? 'bg-red-100 text-red-700' : item.org_type === 'government' ? 'bg-indigo-100 text-indigo-700' : item.org_type === 'school' ? 'bg-emerald-100 text-emerald-700' : 'bg-purple-100 text-purple-700'}`}>
+                  <span className={`badge !text-[10px] !py-0.5 !px-2 ${item.org_type === 'party' ? 'bg-red-100 text-red-700' : item.org_type === 'government' ? 'bg-indigo-100 text-indigo-700' : 'bg-purple-100 text-purple-700'}`}>
                     {item.org_type === 'party' ? '🚩 Đảng' : item.org_type === 'government' ? '🏢 CQ' : '📋 Chung'}
                   </span>
                 </div>
@@ -396,7 +390,6 @@ export default function MeetingManagement() {
                   org_type: item.org_type || 'all',
                   participant_department_ids: item.participant_department_ids || [], 
                   participant_position_ids: item.participant_position_ids || [], 
-                  participant_neighborhood_ids: item.participant_neighborhood_ids || [], 
                   meeting_date: item.meeting_date, 
                   meeting_time: item.meeting_time, 
                   meeting_end_time: item.meeting_end_time || '11:00',
@@ -458,7 +451,7 @@ export default function MeetingManagement() {
                   </div>
                   <div>
                     <div className="font-semibold text-sm">{item.full_name}</div>
-                    <div className="text-[11px] text-brand-text/40">{item.position_name || '--'} / {item.department_name || item.neighborhood_name || '--'}</div>
+                    <div className="text-[11px] text-brand-text/40">{item.position_name || '--'} / {item.department_name || '--'}</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-3 text-right">

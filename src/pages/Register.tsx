@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { UserPlus, Flag, GraduationCap, Landmark, KeyRound, Smartphone, User, Loader2, AlertCircle, ArrowLeft } from 'lucide-react';
+import { UserPlus, Flag, Landmark, KeyRound, Smartphone, User, Loader2, AlertCircle, ArrowLeft } from 'lucide-react';
 import { Department, Position } from '../types';
 import { useNavigate } from 'react-router-dom';
 

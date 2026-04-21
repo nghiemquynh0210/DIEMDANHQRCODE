@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Building2, CalendarDays, MapPinned, Shapes, Users, TrendingUp, Clock, MapPin, FileText } from 'lucide-react';
+import { Building2, CalendarDays, Shapes, Users, TrendingUp, Clock, MapPin, FileText } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 export default function Dashboard() {
@@ -12,7 +12,6 @@ export default function Dashboard() {
           { count: totalStaff },
           { count: totalDepartments },
           { count: totalPositions },
-          { count: totalNeighborhoods },
           { count: totalMeetings },
           { data: recentMeetings },
           { data: allStaff }
@@ -20,10 +19,9 @@ export default function Dashboard() {
           supabase.from('staff').select('id', { count: 'exact', head: true }),
           supabase.from('departments').select('id', { count: 'exact', head: true }),
           supabase.from('positions').select('id', { count: 'exact', head: true }),
-          supabase.from('neighborhoods').select('id', { count: 'exact', head: true }),
           supabase.from('meetings').select('id', { count: 'exact', head: true }),
           supabase.from('meetings').select('*').order('meeting_date', { ascending: false }).limit(1),
-          supabase.from('staff').select('id, department_id, position_id, neighborhood_id').eq('status', 'active')
+          supabase.from('staff').select('id, department_id, position_id, party_department_id, party_position_id').eq('status', 'active')
         ]);
 
         let present = 0, late = 0, absent = 0;
@@ -40,11 +38,12 @@ export default function Dashboard() {
             late = attendance.filter(a => a.status === 'late').length;
             
             let invitedStaff = allStaff || [];
-            if (meeting.participant_department_ids?.length || meeting.participant_position_ids?.length || meeting.participant_neighborhood_ids?.length) {
+            if (meeting.participant_department_ids?.length || meeting.participant_position_ids?.length) {
               invitedStaff = invitedStaff.filter((s: any) => 
                 (meeting.participant_department_ids || []).includes(s.department_id) ||
+                (meeting.participant_department_ids || []).includes(s.party_department_id) ||
                 (meeting.participant_position_ids || []).includes(s.position_id) ||
-                (meeting.participant_neighborhood_ids || []).includes(s.neighborhood_id)
+                (meeting.participant_position_ids || []).includes(s.party_position_id)
               );
             }
             
@@ -58,7 +57,6 @@ export default function Dashboard() {
           totalStaff: totalStaff || 0,
           totalDepartments: totalDepartments || 0,
           totalPositions: totalPositions || 0,
-          totalNeighborhoods: totalNeighborhoods || 0,
           totalMeetings: totalMeetings || 0,
           lastMeeting: latestMeeting,
           lastMeetingStats: { present, late, absent }
@@ -75,7 +73,7 @@ export default function Dashboard() {
     return (
       <div className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-5">
-          {[...Array(5)].map((_, i) => (
+          {[...Array(4)].map((_, i) => (
             <div key={i} className="rounded-2xl p-6 h-[120px] skeleton" />
           ))}
         </div>
@@ -88,7 +86,6 @@ export default function Dashboard() {
     { label: 'Tổng nhân sự', value: stats.totalStaff, icon: Users, gradient: 'stat-card-1' },
     { label: 'Phòng ban', value: stats.totalDepartments, icon: Building2, gradient: 'stat-card-2' },
     { label: 'Chức danh', value: stats.totalPositions, icon: Shapes, gradient: 'stat-card-3' },
-    { label: 'Khu phố', value: stats.totalNeighborhoods, icon: MapPinned, gradient: 'stat-card-4' },
     { label: 'Cuộc họp', value: stats.totalMeetings, icon: CalendarDays, gradient: 'stat-card-5' },
   ];
 

@@ -22,7 +22,6 @@ export default function App() {
   
   const [navigationParams, setNavigationParams] = useState<{
     departmentId?: string;
-    neighborhoodId?: string;
     triggerAdd?: boolean;
   }>({});
 
@@ -46,7 +45,7 @@ export default function App() {
 
   const navigateToPage = (
     page: Page,
-    params: { departmentId?: string; neighborhoodId?: string; triggerAdd?: boolean } = {},
+    params: { departmentId?: string; triggerAdd?: boolean } = {},
   ) => {
     setActivePage(page);
     setNavigationParams(params);

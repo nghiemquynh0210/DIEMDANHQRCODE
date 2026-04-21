@@ -82,7 +82,6 @@ export default function QRScanner() {
       staff_code: s.staff_code || '--',
       position_name: s.position_name || '--',
       department_name: s.department_name || '--',
-      neighborhood_name: s.neighborhood_name || '--',
     }));
 
     setAttendance([...mapped, ...mappedAbsent]);
@@ -336,7 +335,7 @@ export default function QRScanner() {
                   </div>
                   <div>
                     <div className={`font-semibold text-sm ${checked ? 'text-brand-text/50' : ''}`}>{item.full_name}</div>
-                    <div className="text-[11px] text-brand-text/35">{item.position_name || '--'} / {item.department_name || item.neighborhood_name || '--'}</div>
+                    <div className="text-[11px] text-brand-text/35">{item.position_name || '--'} / {item.department_name || '--'}</div>
                   </div>
                 </div>
                 {checked ? (
@@ -401,7 +400,7 @@ export default function QRScanner() {
                 </div>
                 <div>
                   <div className="font-semibold text-sm">{item.full_name}</div>
-                  <div className="text-[10px] text-brand-text/35">{item.department_name || item.neighborhood_name || '--'}</div>
+                  <div className="text-[10px] text-brand-text/35">{item.department_name || '--'}</div>
                 </div>
               </div>
               <div className="flex items-center gap-3 text-right">
