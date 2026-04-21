@@ -101,7 +101,6 @@ export default function StaffManagement({
   };
 
   const remove = async (id: number) => {
-    if (!confirm('Xác nhận xóa?')) return;
     await supabase.from('users').delete().eq('staff_id', id);
     await supabase.from('staff').delete().eq('id', id);
     load();

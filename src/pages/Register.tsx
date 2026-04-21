@@ -61,7 +61,6 @@ export default function Register() {
       if (session) {
         const { error: insertError } = await supabase.from('staff').insert(staffPayload);
         if (insertError) throw insertError;
-        alert('Đăng ký thành công! Đang tự động đăng nhập...');
         navigate('/');
       } else {
         const { error: loginError } = await supabase.auth.signInWithPassword({
@@ -73,7 +72,6 @@ export default function Register() {
         }
         const { error: insertError } = await supabase.from('staff').insert(staffPayload);
         if (insertError) throw insertError;
-        alert('Đăng ký thành công!');
         navigate('/');
       }
     } catch (err: any) {

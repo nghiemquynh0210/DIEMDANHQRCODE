@@ -113,7 +113,6 @@ export default function MeetingManagement() {
       
       if (result.error) {
          console.error('Supabase DB error: ', result.error);
-         alert('Lỗi khi lưu dữ liệu do cơ sở dữ liệu: ' + result.error.message);
          return;
       }
       
@@ -124,12 +123,10 @@ export default function MeetingManagement() {
       load();
     } catch (err: any) {
       console.error('Save error:', err);
-      alert('Lỗi kết nối máy chủ hoặc logic Javascript nội bộ: ' + (err.message || ''));
     }
   };
 
   const remove = async (id: number) => {
-    if (!confirm('Bạn có chắc muốn xóa cuộc họp này?')) return;
     await supabase.from('attendance').delete().eq('meeting_id', id);
     await supabase.from('meetings').delete().eq('id', id);
     load();
@@ -154,7 +151,7 @@ export default function MeetingManagement() {
     setSelectedMeetingForAttendance(meeting);
     const { data } = await supabase
       .from('attendance')
-      .select('*, staff(full_name, staff_code, departments:department_id(name), positions:position_id(name))')
+      .select('*, staff(full_name, staff_code, departments:department_id(name), positions:position_id(name), party_departments:party_department_id(name), party_positions:party_position_id(name))')
       .eq('meeting_id', meeting.id)
       .order('checkin_time', { ascending: false });
 
@@ -174,8 +171,8 @@ export default function MeetingManagement() {
       ...item,
       full_name: item.staff?.full_name || '--',
       staff_code: item.staff?.staff_code || '--',
-      department_name: item.staff?.departments?.name || '--',
-      position_name: item.staff?.positions?.name || '--',
+      department_name: item.staff?.departments?.name || item.staff?.party_departments?.name || '--',
+      position_name: item.staff?.positions?.name || item.staff?.party_positions?.name || '--',
     }));
 
     const absentStaff = invitedStaff.filter(s => !attendedStaffIds.has(s.id));
@@ -197,16 +194,15 @@ export default function MeetingManagement() {
 
   const cancelCheckin = async (staffId: number) => {
     if (!selectedMeetingForAttendance) return;
-    if (!confirm('Bạn có chắc muốn hủy điểm danh của cán bộ này?')) return;
     try {
       const { error } = await supabase.from('attendance').delete().eq('meeting_id', selectedMeetingForAttendance.id).eq('staff_id', staffId);
       if (error) {
-        alert(error.message);
+        console.error('Cancel checkin error:', error.message);
         return;
       }
       await showAttendance(selectedMeetingForAttendance);
     } catch (err: any) {
-      alert(err.message);
+      console.error('Cancel checkin error:', err.message);
     }
   };
 

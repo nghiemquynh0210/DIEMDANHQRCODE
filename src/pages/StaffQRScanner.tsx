@@ -110,19 +110,11 @@ export default function StaffQRScanner() {
     }
     setConfirmingId(meetingId);
     try {
-      const { data: existing } = await supabase.from('attendance')
-        .select('id').eq('meeting_id', meetingId).eq('staff_id', staffId).maybeSingle();
-
-      if (existing) {
-        setStatus({ type: 'info', message: 'Bạn đã điểm danh cuộc họp này rồi!' });
-        return;
-      }
-
-      const { error } = await supabase.from('attendance').insert({
+      const { error } = await supabase.from('attendance').upsert({
         meeting_id: meetingId,
         staff_id: staffId,
         checkin_method: 'self',
-      });
+      }, { onConflict: 'meeting_id,staff_id' });
 
       if (error) {
         setStatus({ type: 'error', message: error.message });
