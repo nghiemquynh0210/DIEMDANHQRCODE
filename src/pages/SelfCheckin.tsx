@@ -1,102 +1,141 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { AlertCircle, ArrowRight, Calendar, CheckCircle2, Clock, FileText, Loader2, MapPin, QrCode, Search, User } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
+import { AlertCircle, Calendar, CheckCircle2, Clock, FileText, Loader2, MapPin, QrCode, Users } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { useAuth } from '../contexts/AuthContext';
-import Login from './Login';
 
 export default function SelfCheckin() {
   const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
   const meetingId = searchParams.get('meetingId');
   const [meeting, setMeeting] = useState<any>(null);
-  const [status, setStatus] = useState<{ type: 'loading' | 'success' | 'error' | 'idle' | 'select-staff'; message: string }>({ type: 'loading', message: 'Đang tải thông tin...' });
-  const { user, loading: authLoading } = useAuth();
-  
-  // Staff selection state (when email doesn't match any staff)
-  const [allStaff, setAllStaff] = useState<any[]>([]);
-  const [staffSearch, setStaffSearch] = useState('');
-  const [selectedStaffId, setSelectedStaffId] = useState<number | null>(null);
-  
-  const showLogin = !authLoading && !user;
+  const [invitedStaff, setInvitedStaff] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [checkedInId, setCheckedInId] = useState<number | null>(null);
+  const [checkedInName, setCheckedInName] = useState('');
+  const [processingId, setProcessingId] = useState<number | null>(null);
 
   useEffect(() => {
-    if (!user || !meetingId) {
-      if (!meetingId) setStatus({ type: 'error', message: 'Không tìm thấy thông tin cuộc họp.' });
+    if (!meetingId) {
+      setError('Không tìm thấy thông tin cuộc họp.');
+      setLoading(false);
       return;
     }
 
-    Promise.all([
-      supabase.from('meetings').select('*').eq('id', meetingId).single(),
-      supabase.from('staff').select('id, full_name, staff_code, email').eq('status', 'active').order('full_name'),
-    ]).then(([meetingRes, staffRes]) => {
-      if (meetingRes.data && !meetingRes.error) {
-        setMeeting(meetingRes.data);
-        setAllStaff(staffRes.data || []);
-        
-        // Try auto-match by email
-        if (user.staff_id) {
-          // Already linked via AuthContext
-          setStatus({ type: 'idle', message: '' });
-        } else if (user.email) {
-          const match = (staffRes.data || []).find((s: any) => s.email && s.email.toLowerCase() === user.email.toLowerCase());
-          if (match) {
-            setSelectedStaffId(match.id);
-            setStatus({ type: 'idle', message: '' });
-          } else {
-            // No email match — ask staff to select themselves
-            setStatus({ type: 'select-staff', message: 'Vui lòng chọn tên của bạn để điểm danh.' });
-          }
-        } else {
-          setStatus({ type: 'select-staff', message: 'Vui lòng chọn tên của bạn để điểm danh.' });
-        }
-      } else {
-        setStatus({ type: 'error', message: 'Cuộc họp không tồn tại hoặc đã bị xóa.' });
+    const loadData = async () => {
+      // Load meeting
+      const { data: m, error: mErr } = await supabase
+        .from('meetings').select('*').eq('id', meetingId).single();
+
+      if (!m || mErr) {
+        setError('Cuộc họp không tồn tại hoặc đã bị xóa.');
+        setLoading(false);
+        return;
       }
-    });
-  }, [user, meetingId]);
+      setMeeting(m);
 
-  const handleConfirm = async (overrideStaffId?: number) => {
-    setStatus({ type: 'loading', message: 'Đang xác thực danh tính...' });
+      // Load all active staff with their departments/positions
+      const { data: allStaff } = await supabase
+        .from('staff')
+        .select('id, full_name, staff_code, department_id, position_id, party_department_id, party_position_id')
+        .eq('status', 'active')
+        .order('full_name');
 
-    const staffId = overrideStaffId || selectedStaffId || user?.staff_id;
+      // Filter to invited members based on meeting criteria
+      let filtered = allStaff || [];
+      const deptIds: number[] = m.participant_department_ids || [];
+      const posIds: number[] = m.participant_position_ids || [];
 
-    if (!staffId) {
-      setStatus({ type: 'error', message: 'Chưa xác định được nhân sự. Vui lòng chọn tên của bạn.' });
-      return;
-    }
+      if (deptIds.length > 0 || posIds.length > 0) {
+        filtered = filtered.filter(s =>
+          deptIds.includes(s.department_id) ||
+          deptIds.includes(s.party_department_id) ||
+          posIds.includes(s.position_id) ||
+          posIds.includes(s.party_position_id)
+        );
+      }
+      // If no filters → all staff are invited
+
+      // Check who already checked in
+      const { data: attendance } = await supabase
+        .from('attendance')
+        .select('staff_id')
+        .eq('meeting_id', meetingId);
+      
+      const checkedIds = new Set((attendance || []).map((a: any) => a.staff_id));
+      
+      setInvitedStaff(filtered.map(s => ({
+        ...s,
+        alreadyCheckedIn: checkedIds.has(s.id),
+      })));
+      setLoading(false);
+    };
+
+    loadData();
+  }, [meetingId]);
+
+  const handleCheckin = async (staffId: number, staffName: string) => {
+    setProcessingId(staffId);
     
     const { error } = await supabase.from('attendance').upsert({
-      meeting_id: meeting.id,
+      meeting_id: Number(meetingId),
       staff_id: staffId,
       checkin_method: 'self',
     }, { onConflict: 'meeting_id,staff_id' });
 
     if (!error) {
-      setStatus({ type: 'success', message: 'Điểm danh thành công.' });
+      setCheckedInId(staffId);
+      setCheckedInName(staffName);
     } else {
-      setStatus({ type: 'error', message: error.message || 'Điểm danh thất bại.' });
+      setError(error.message || 'Điểm danh thất bại.');
     }
+    setProcessingId(null);
   };
 
-  if (showLogin) return <Login />;
-
-  if (status.type === 'loading') {
+  // ─── LOADING ───
+  if (loading) {
     return (
       <div style={{ background: 'linear-gradient(135deg, #312E81, #4C1D95, #6D28D9)', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="w-10 h-10 animate-spin text-white/70" />
-          <span className="text-sm font-medium text-white/50">{status.message}</span>
+        <div style={{ textAlign: 'center' }}>
+          <Loader2 style={{ width: 40, height: 40, color: 'rgba(255,255,255,0.7)', animation: 'spin 1s linear infinite' }} />
+          <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 14, marginTop: 16 }}>Đang tải cuộc họp...</p>
         </div>
       </div>
     );
   }
 
-  const filteredStaff = allStaff.filter(s => 
-    s.full_name.toLowerCase().includes(staffSearch.toLowerCase()) || 
-    (s.staff_code || '').toLowerCase().includes(staffSearch.toLowerCase())
-  );
+  // ─── ERROR ───
+  if (error && !meeting) {
+    return (
+      <div style={{ background: 'linear-gradient(135deg, #312E81, #4C1D95, #6D28D9)', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+        <div style={{ background: 'white', borderRadius: 20, padding: 32, maxWidth: 400, width: '100%', textAlign: 'center' }}>
+          <AlertCircle style={{ width: 48, height: 48, color: '#EF4444', margin: '0 auto 16px' }} />
+          <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>Lỗi</h2>
+          <p style={{ color: '#6B7280', fontSize: 14 }}>{error}</p>
+        </div>
+      </div>
+    );
+  }
 
+  // ─── SUCCESS ───
+  if (checkedInId) {
+    return (
+      <div style={{ background: 'linear-gradient(135deg, #312E81, #4C1D95, #6D28D9)', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+        <div style={{ background: 'white', borderRadius: 24, padding: 32, maxWidth: 400, width: '100%', textAlign: 'center', boxShadow: '0 25px 50px rgba(0,0,0,0.25)' }}>
+          <div style={{ width: 72, height: 72, background: '#D1FAE5', borderRadius: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+            <CheckCircle2 style={{ width: 36, height: 36, color: '#059669' }} />
+          </div>
+          <h2 style={{ fontSize: 22, fontWeight: 800, color: '#1F2937', marginBottom: 8 }}>Điểm danh thành công!</h2>
+          <p style={{ color: '#6B7280', fontSize: 15, marginBottom: 4 }}>{checkedInName}</p>
+          <p style={{ color: '#9CA3AF', fontSize: 13 }}>{meeting?.title}</p>
+          <div style={{ marginTop: 24, padding: '12px 16px', background: '#F0FDF4', borderRadius: 12, border: '1px solid #BBF7D0' }}>
+            <p style={{ fontSize: 13, color: '#166534', fontWeight: 600 }}>✓ Đã ghi nhận điểm danh của bạn</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── MAIN: Meeting info + Staff list ───
   return (
     <div style={{
       background: 'linear-gradient(135deg, #312E81, #4C1D95, #6D28D9)',
@@ -105,12 +144,11 @@ export default function SelfCheckin() {
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
-      justifyContent: 'center',
       padding: '16px',
       boxSizing: 'border-box',
-      overflow: 'auto',
     }}>
-      <div style={{ width: '100%', maxWidth: '420px', position: 'relative', zIndex: 10 }}>
+      <div style={{ width: '100%', maxWidth: '440px' }}>
+        {/* Header Card */}
         <div style={{
           background: 'rgba(255,255,255,0.12)',
           backdropFilter: 'blur(24px)',
@@ -119,149 +157,145 @@ export default function SelfCheckin() {
           borderRadius: '24px',
           boxShadow: '0 25px 50px rgba(0,0,0,0.25)',
           overflow: 'hidden',
+          marginBottom: 16,
         }}>
-          {/* Header */}
+          {/* Purple header */}
           <div style={{
             background: 'linear-gradient(135deg, #4F46E5, #7C3AED)',
-            padding: '24px 20px',
+            padding: '20px 20px 16px',
             textAlign: 'center',
             color: 'white',
           }}>
             <div style={{
-              width: 56, height: 56,
+              width: 48, height: 48,
               background: 'rgba(255,255,255,0.15)',
-              borderRadius: 16,
+              borderRadius: 14,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              margin: '0 auto 12px',
+              margin: '0 auto 10px',
               border: '1px solid rgba(255,255,255,0.2)',
             }}>
-              <QrCode size={28} />
+              <QrCode size={24} />
             </div>
-            <h1 style={{ fontSize: 18, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '-0.01em', margin: 0 }}>
-              Xác nhận điểm danh
+            <h1 style={{ fontSize: 16, fontWeight: 800, textTransform: 'uppercase', margin: 0 }}>
+              Điểm danh cuộc họp
             </h1>
-            <p style={{ fontSize: 13, opacity: 0.6, marginTop: 4, fontWeight: 500 }}>UBND Phường An Phú</p>
+            <p style={{ fontSize: 12, opacity: 0.6, marginTop: 4, fontWeight: 500 }}>UBND Phường An Phú</p>
           </div>
 
-          {/* Body */}
-          <div style={{ padding: '24px 20px', background: 'rgba(255,255,255,0.92)' }}>
-            {status.type === 'success' ? (
-              <div className="text-center py-4 animate-fade-in-up">
-                <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-5">
-                  <CheckCircle2 size={32} />
+          {/* Meeting info */}
+          <div style={{ padding: '16px 20px', background: 'rgba(255,255,255,0.95)' }}>
+            <h3 style={{ fontSize: 15, fontWeight: 700, color: '#1F2937', marginBottom: 12, lineHeight: 1.4 }}>{meeting?.title}</h3>
+            
+            {meeting?.content && (
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 10 }}>
+                <div style={{ width: 28, height: 28, borderRadius: 8, background: '#F3E8FF', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <FileText size={14} style={{ color: '#9333EA' }} />
                 </div>
-                <h2 className="text-xl font-bold text-brand-text mb-2">Thành công!</h2>
-                <p className="text-brand-text/50 text-sm mb-6">{status.message}</p>
-                <button onClick={() => navigate('/')} className="btn-primary w-full justify-center h-12">
-                  <span>Về trang chủ</span>
-                  <ArrowRight size={16} />
-                </button>
+                <span style={{ fontSize: 13, color: '#6B7280', fontWeight: 500, lineHeight: 1.5 }}>{meeting.content}</span>
               </div>
-            ) : status.type === 'error' ? (
-              <div className="text-center py-4 animate-fade-in-up">
-                <div className="w-16 h-16 bg-red-100 text-red-500 rounded-2xl flex items-center justify-center mx-auto mb-5">
-                  <AlertCircle size={32} />
-                </div>
-                <h2 className="text-xl font-bold text-brand-text mb-2">Lỗi</h2>
-                <p className="text-brand-text/50 text-sm mb-6">{status.message}</p>
-                <button onClick={() => navigate('/')} className="btn-secondary w-full justify-center h-12">
-                  <span>Về trang chủ</span>
-                </button>
+            )}
+
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#6B7280', background: '#F3F4F6', padding: '6px 10px', borderRadius: 8 }}>
+                <Calendar size={13} style={{ color: '#4F46E5' }} />
+                <span style={{ fontWeight: 600 }}>{meeting?.meeting_date}</span>
               </div>
-            ) : status.type === 'select-staff' ? (
-              /* Staff selection mode — user picks their name */
-              <div className="animate-fade-in-up">
-                <div className="flex items-center gap-2.5 mb-4">
-                  <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center shrink-0">
-                    <User size={16} className="text-amber-600" />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#6B7280', background: '#F3F4F6', padding: '6px 10px', borderRadius: 8 }}>
+                <Clock size={13} style={{ color: '#4F46E5' }} />
+                <span style={{ fontWeight: 600 }}>{meeting?.meeting_time}</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#6B7280', background: '#F3F4F6', padding: '6px 10px', borderRadius: 8 }}>
+                <MapPin size={13} style={{ color: '#4F46E5' }} />
+                <span style={{ fontWeight: 600 }}>{meeting?.location}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Staff list */}
+        <div style={{
+          background: 'rgba(255,255,255,0.95)',
+          borderRadius: 20,
+          padding: '16px',
+          boxShadow: '0 10px 30px rgba(0,0,0,0.15)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+            <Users size={16} style={{ color: '#4F46E5' }} />
+            <span style={{ fontSize: 13, fontWeight: 700, color: '#1F2937' }}>Thành phần tham dự ({invitedStaff.length})</span>
+          </div>
+
+          <p style={{ fontSize: 12, color: '#9CA3AF', marginBottom: 12, fontWeight: 500 }}>
+            Bấm vào tên của bạn để xác nhận điểm danh
+          </p>
+
+          {error && (
+            <div style={{ padding: '10px 12px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 10, marginBottom: 12 }}>
+              <p style={{ fontSize: 13, color: '#DC2626', fontWeight: 600 }}>{error}</p>
+            </div>
+          )}
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: '55vh', overflowY: 'auto' }}>
+            {invitedStaff.map(s => (
+              <button
+                key={s.id}
+                onClick={() => !s.alreadyCheckedIn && handleCheckin(s.id, s.full_name)}
+                disabled={s.alreadyCheckedIn || processingId === s.id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                  padding: '12px 14px',
+                  borderRadius: 14,
+                  border: s.alreadyCheckedIn ? '1px solid #BBF7D0' : '1px solid #E5E7EB',
+                  background: s.alreadyCheckedIn ? '#F0FDF4' : processingId === s.id ? '#EEF2FF' : 'white',
+                  cursor: s.alreadyCheckedIn ? 'default' : 'pointer',
+                  width: '100%',
+                  textAlign: 'left',
+                  transition: 'all 0.15s',
+                  opacity: processingId !== null && processingId !== s.id ? 0.5 : 1,
+                }}
+              >
+                <div style={{
+                  width: 36, height: 36,
+                  borderRadius: 10,
+                  background: s.alreadyCheckedIn ? '#D1FAE5' : 'linear-gradient(135deg, #4F46E5, #7C3AED)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: s.alreadyCheckedIn ? '#059669' : 'white',
+                  fontSize: 12, fontWeight: 700,
+                  flexShrink: 0,
+                }}>
+                  {s.alreadyCheckedIn ? <CheckCircle2 size={18} /> : s.full_name.charAt(0)}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: s.alreadyCheckedIn ? '#6B7280' : '#1F2937', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {s.full_name}
                   </div>
-                  <div>
-                    <h3 className="font-bold text-sm text-brand-text">Chọn tên của bạn</h3>
-                    <p className="text-[10px] text-brand-text/40">{status.message}</p>
-                  </div>
-                </div>
-
-                {/* Meeting info */}
-                <div className="p-3 rounded-xl bg-indigo-50 border border-indigo-100 mb-4">
-                  <p className="font-bold text-sm text-brand-text mb-1">{meeting?.title}</p>
-                  <p className="text-[11px] text-brand-text/50">{meeting?.meeting_date} • {meeting?.meeting_time} • {meeting?.location}</p>
-                </div>
-
-                {/* Search */}
-                <div className="relative mb-3">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-text/30" size={16} />
-                  <input 
-                    className="input pl-10 !text-sm" 
-                    placeholder="Tìm tên hoặc mã nhân sự..." 
-                    value={staffSearch} 
-                    onChange={e => setStaffSearch(e.target.value)}
-                    autoFocus
-                  />
-                </div>
-
-                {/* Staff list */}
-                <div className="space-y-1.5 max-h-[300px] overflow-y-auto pr-1">
-                  {filteredStaff.map(s => (
-                    <button 
-                      key={s.id}
-                      onClick={() => handleConfirm(s.id)}
-                      className={`w-full text-left p-3 rounded-xl border transition-all flex items-center gap-3 hover:bg-indigo-50 hover:border-indigo-200 border-gray-100`}
-                    >
-                      <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white text-[10px] font-bold shrink-0">
-                        {s.full_name.charAt(0)}
-                      </div>
-                      <div className="min-w-0">
-                        <div className="text-sm font-semibold text-brand-text truncate">{s.full_name}</div>
-                        <div className="text-[10px] text-brand-text/40">{s.staff_code || '--'}</div>
-                      </div>
-                    </button>
-                  ))}
-                  {filteredStaff.length === 0 && (
-                    <p className="text-center text-brand-text/30 text-xs py-6">Không tìm thấy nhân sự</p>
+                  {s.alreadyCheckedIn && (
+                    <div style={{ fontSize: 11, color: '#059669', fontWeight: 600 }}>✓ Đã điểm danh</div>
                   )}
                 </div>
-              </div>
-            ) : (
-              <>
-                <div className="space-y-3 mb-6">
-                  <h3 className="text-lg font-bold text-brand-text">{meeting?.title}</h3>
-                  
-                  {/* Nội dung cuộc họp */}
-                  {meeting?.content && (
-                    <div className="flex items-start gap-3 text-sm text-brand-text/60">
-                      <div className="w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center shrink-0 mt-0.5">
-                        <FileText size={15} className="text-purple-500" />
-                      </div>
-                      <span className="font-medium leading-relaxed">{meeting.content}</span>
-                    </div>
-                  )}
-
-                  <div className="space-y-2.5">
-                    <div className="flex items-center gap-3 text-sm text-brand-text/60">
-                      <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center shrink-0">
-                        <Calendar size={15} className="text-primary" />
-                      </div>
-                      <span className="font-medium">{meeting?.meeting_date}</span>
-                    </div>
-                    <div className="flex items-center gap-3 text-sm text-brand-text/60">
-                      <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center shrink-0">
-                        <Clock size={15} className="text-primary" />
-                      </div>
-                      <span className="font-medium">{meeting?.meeting_time}</span>
-                    </div>
-                    <div className="flex items-center gap-3 text-sm text-brand-text/60">
-                      <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center shrink-0">
-                        <MapPin size={15} className="text-primary" />
-                      </div>
-                      <span className="font-medium">{meeting?.location}</span>
-                    </div>
+                {!s.alreadyCheckedIn && processingId !== s.id && (
+                  <div style={{
+                    padding: '6px 14px',
+                    background: 'linear-gradient(135deg, #4F46E5, #7C3AED)',
+                    color: 'white',
+                    borderRadius: 10,
+                    fontSize: 12,
+                    fontWeight: 700,
+                    flexShrink: 0,
+                  }}>
+                    Xác nhận
                   </div>
-                </div>
-                <button onClick={() => handleConfirm()} className="btn-primary w-full justify-center h-12 text-base">
-                  <CheckCircle2 size={20} />
-                  <span className="font-bold">XÁC NHẬN ĐIỂM DANH</span>
-                </button>
-              </>
+                )}
+                {processingId === s.id && (
+                  <Loader2 size={18} style={{ color: '#4F46E5', animation: 'spin 1s linear infinite', flexShrink: 0 }} />
+                )}
+              </button>
+            ))}
+            {invitedStaff.length === 0 && (
+              <p style={{ textAlign: 'center', color: '#9CA3AF', fontSize: 13, padding: '24px 0' }}>
+                Chưa có thành phần tham dự
+              </p>
             )}
           </div>
         </div>
