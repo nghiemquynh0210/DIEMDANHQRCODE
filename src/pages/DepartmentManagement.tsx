@@ -8,7 +8,7 @@ type OrgTab = 'party' | 'government' | 'school';
 const TAB_CONFIG = {
   party:      { label: 'Đảng ủy',    icon: Flag,          deptLabel: 'Chi bộ / Đơn vị Đảng', posLabel: 'Chức vụ Đảng',       deptPH: 'VD: Chi bộ cơ quan...',     posPH: 'VD: Bí thư, Phó BT...',     color: 'red',     gradient: 'from-red-500 to-rose-500',     posGradient: 'from-orange-500 to-amber-500' },
   government: { label: 'Chính quyền', icon: Landmark,      deptLabel: 'Phòng ban / Đơn vị CQ', posLabel: 'Chức vụ Chính quyền', deptPH: 'VD: Văn phòng UBND...',     posPH: 'VD: Chủ tịch, Trưởng KP...', color: 'indigo',  gradient: 'from-indigo-500 to-purple-500', posGradient: 'from-cyan-500 to-blue-500' },
-  school:     { label: 'Nhà trường',  icon: GraduationCap, deptLabel: 'Trường / Đơn vị GD',    posLabel: 'Chức vụ Nhà trường', deptPH: 'VD: Trường TH An Phú...',  posPH: 'VD: Hiệu trưởng, GV...',    color: 'emerald', gradient: 'from-emerald-500 to-teal-500',  posGradient: 'from-lime-500 to-green-500' },
+
 };
 
 export default function DepartmentManagement({
@@ -162,7 +162,7 @@ export default function DepartmentManagement({
         </div>
         <div>
           <h2 className="text-lg font-bold text-brand-text">Cơ cấu tổ chức</h2>
-          <p className="text-[11px] text-brand-text/40 font-medium">Quản lý đơn vị, chức vụ Đảng ủy, Chính quyền & Nhà trường</p>
+          <p className="text-[11px] text-brand-text/40 font-medium">Quản lý đơn vị, chức vụ Đảng ủy, Chính quyền</p>
         </div>
       </div>
 
