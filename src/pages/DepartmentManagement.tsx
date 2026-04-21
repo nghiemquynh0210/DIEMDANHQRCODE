@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Building2, Flag, GraduationCap, Landmark, MapPinned, Plus, Shapes, Trash2, Users } from 'lucide-react';
+import { Building2, Check, Flag, GraduationCap, Landmark, MapPinned, Pencil, Plus, Shapes, Trash2, Users, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Department, Neighborhood, Position } from '../types';
 
@@ -25,6 +25,10 @@ export default function DepartmentManagement({
   const [newPos, setNewPos] = useState('');
   const [newNb, setNewNb] = useState('');
 
+  // Inline edit state
+  const [editingId, setEditingId] = useState<{ table: string; id: number } | null>(null);
+  const [editingName, setEditingName] = useState('');
+
   const load = async () => {
     const [{ data: a }, { data: b }, { data: c }] = await Promise.all([
       supabase.from('departments').select('*').order('name'),
@@ -48,14 +52,12 @@ export default function DepartmentManagement({
     setNewDept('');
     load();
   };
-
   const addPos = async () => {
     if (!newPos.trim()) return;
     await supabase.from('positions').insert({ name: newPos.trim(), org_type: activeTab });
     setNewPos('');
     load();
   };
-
   const addNb = async () => {
     if (!newNb.trim()) return;
     await supabase.from('neighborhoods').insert({ name: newNb.trim() });
@@ -68,6 +70,68 @@ export default function DepartmentManagement({
     await supabase.from(table).delete().eq('id', id);
     load();
   };
+
+  const startEdit = (table: string, id: number, name: string) => {
+    setEditingId({ table, id });
+    setEditingName(name);
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditingName('');
+  };
+
+  const saveEdit = async () => {
+    if (!editingId || !editingName.trim()) return;
+    await supabase.from(editingId.table).update({ name: editingName.trim() }).eq('id', editingId.id);
+    cancelEdit();
+    load();
+  };
+
+  const isEditing = (table: string, id: number) => editingId?.table === table && editingId?.id === id;
+
+  // Reusable item renderer
+  const renderItem = (item: { id: number; name: string }, table: string, colorClass: string, showStaffBtn?: boolean, staffFilter?: object) => (
+    <div key={item.id} className="flex items-center justify-between p-2.5 rounded-xl border border-gray-100 hover:bg-gray-50/80 transition-all">
+      {isEditing(table, item.id) ? (
+        <>
+          <input
+            className="input text-sm flex-1 mr-2 !py-1.5"
+            value={editingName}
+            onChange={e => setEditingName(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') cancelEdit(); }}
+            autoFocus
+          />
+          <div className="flex items-center gap-1 shrink-0">
+            <button className="p-1.5 text-emerald-500 hover:bg-emerald-50 rounded-lg" onClick={saveEdit} title="Lưu"><Check size={14} /></button>
+            <button className="p-1.5 text-gray-400 hover:bg-gray-100 rounded-lg" onClick={cancelEdit} title="Hủy"><X size={14} /></button>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="flex items-center gap-2.5 flex-1 min-w-0">
+            <div className={`w-7 h-7 rounded-lg ${colorClass} flex items-center justify-center text-[10px] font-bold shrink-0`}>
+              {item.name.charAt(0)}
+            </div>
+            <span className="text-sm font-medium text-brand-text truncate">{item.name}</span>
+          </div>
+          <div className="flex items-center gap-0.5 shrink-0">
+            {showStaffBtn && (
+              <button className="p-1.5 text-indigo-400 hover:bg-indigo-50 rounded-lg" title="Xem nhân sự" onClick={() => onNavigateToStaff(staffFilter)}>
+                <Users size={13} />
+              </button>
+            )}
+            <button className="p-1.5 text-amber-500 hover:bg-amber-50 rounded-lg" title="Sửa" onClick={() => startEdit(table, item.id, item.name)}>
+              <Pencil size={13} />
+            </button>
+            <button className="p-1.5 text-red-400 hover:bg-red-50 rounded-lg" title="Xóa" onClick={() => remove(table, item.id)}>
+              <Trash2 size={13} />
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
 
   return (
     <div className="space-y-6">
@@ -90,10 +154,11 @@ export default function DepartmentManagement({
           const colorMap: Record<string, string> = { red: 'text-red-600 border-red-100', indigo: 'text-indigo-600 border-indigo-100', emerald: 'text-emerald-600 border-emerald-100' };
           return (
             <button key={tab} onClick={() => setActiveTab(tab)}
-              className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg font-bold text-sm transition-all ${
-                isActive ? `bg-white ${colorMap[t.color]} shadow-sm border` : 'text-brand-text/50 hover:text-brand-text/70'
-              }`}>
-              <Icon size={16} />{t.label}
+              className={`flex-1 py-2.5 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-all ${
+                isActive ? `bg-white shadow-sm ${colorMap[t.color] || ''} border` : 'text-brand-text/40 hover:text-brand-text/60'
+              }`}
+            >
+              <Icon size={15} /> {t.label}
             </button>
           );
         })}
@@ -116,20 +181,7 @@ export default function DepartmentManagement({
             <button onClick={addDept} className={`btn-primary !py-2 !px-3 !rounded-lg shrink-0 !${cfg.gradient}`}><Plus size={16} /></button>
           </div>
           <div className="flex-1 space-y-1.5 overflow-y-auto max-h-[400px] pr-1">
-            {filteredDepts.map((item) => (
-              <div key={item.id} className="flex items-center justify-between p-2.5 rounded-xl border border-gray-100 hover:bg-gray-50 group transition-all">
-                <div className="flex items-center gap-2.5 flex-1 min-w-0">
-                  <div className={`w-7 h-7 rounded-lg bg-${cfg.color}-50 text-${cfg.color}-600 flex items-center justify-center text-[10px] font-bold shrink-0`}>
-                    {item.name.charAt(0)}
-                  </div>
-                  <span className="text-sm font-medium text-brand-text truncate">{item.name}</span>
-                </div>
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button className={`p-1.5 text-${cfg.color}-500 hover:bg-${cfg.color}-50 rounded-lg`} title="Xem nhân sự" onClick={() => onNavigateToStaff({ departmentId: String(item.id) })}><Users size={13} /></button>
-                  <button className="p-1.5 text-red-400 hover:bg-red-50 rounded-lg" onClick={() => remove('departments', item.id)}><Trash2 size={13} /></button>
-                </div>
-              </div>
-            ))}
+            {filteredDepts.map(item => renderItem(item, 'departments', `bg-${cfg.color}-50 text-${cfg.color}-600`, true, { departmentId: String(item.id) }))}
             {filteredDepts.length === 0 && (<p className="text-center text-brand-text/30 text-xs py-6">Chưa có đơn vị</p>)}
           </div>
         </div>
@@ -148,17 +200,7 @@ export default function DepartmentManagement({
             <button onClick={addPos} className={`btn-primary !py-2 !px-3 !rounded-lg shrink-0 !${cfg.posGradient}`}><Plus size={16} /></button>
           </div>
           <div className="flex-1 space-y-1.5 overflow-y-auto max-h-[400px] pr-1">
-            {filteredPositions.map((item) => (
-              <div key={item.id} className="flex items-center justify-between p-2.5 rounded-xl border border-gray-100 hover:bg-gray-50 group transition-all">
-                <div className="flex items-center gap-2.5 flex-1 min-w-0">
-                  <div className={`w-7 h-7 rounded-lg bg-${cfg.color}-50 text-${cfg.color}-600 flex items-center justify-center text-[10px] font-bold shrink-0`}>
-                    {item.name.charAt(0)}
-                  </div>
-                  <span className="text-sm font-medium text-brand-text truncate">{item.name}</span>
-                </div>
-                <button className="p-1.5 text-red-400 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => remove('positions', item.id)}><Trash2 size={13} /></button>
-              </div>
-            ))}
+            {filteredPositions.map(item => renderItem(item, 'positions', `bg-${cfg.color}-50 text-${cfg.color}-600`))}
             {filteredPositions.length === 0 && (<p className="text-center text-brand-text/30 text-xs py-6">Chưa có chức vụ</p>)}
           </div>
         </div>
@@ -177,18 +219,7 @@ export default function DepartmentManagement({
             <button onClick={addNb} className="btn-primary !py-2 !px-3 !rounded-lg shrink-0 !from-violet-500 !to-fuchsia-500"><Plus size={16} /></button>
           </div>
           <div className="flex-1 space-y-1.5 overflow-y-auto max-h-[400px] pr-1">
-            {neighborhoods.map((item) => (
-              <div key={item.id} className="flex items-center justify-between p-2.5 rounded-xl border border-gray-100 hover:border-violet-200 hover:bg-violet-50/30 group transition-all">
-                <div className="flex items-center gap-2.5 flex-1 min-w-0">
-                  <div className="w-7 h-7 rounded-lg bg-violet-50 text-violet-600 flex items-center justify-center text-[10px] font-bold shrink-0">{item.name.charAt(0)}</div>
-                  <span className="text-sm font-medium text-brand-text truncate">{item.name}</span>
-                </div>
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button className="p-1.5 text-violet-500 hover:bg-violet-50 rounded-lg" title="Xem nhân sự" onClick={() => onNavigateToStaff({ neighborhoodId: String(item.id) })}><Users size={13} /></button>
-                  <button className="p-1.5 text-red-400 hover:bg-red-50 rounded-lg" onClick={() => remove('neighborhoods', item.id)}><Trash2 size={13} /></button>
-                </div>
-              </div>
-            ))}
+            {neighborhoods.map(item => renderItem(item, 'neighborhoods', 'bg-violet-50 text-violet-600', true, { neighborhoodId: String(item.id) }))}
             {neighborhoods.length === 0 && (<p className="text-center text-brand-text/30 text-xs py-6">Chưa có khu phố</p>)}
           </div>
         </div>
