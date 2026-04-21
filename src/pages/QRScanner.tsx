@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { Camera, CameraOff, CheckCircle2, History, Search, Users, Zap } from 'lucide-react';
+import { Camera, CameraOff, CheckCircle2, History, Search, Users, Zap, X } from 'lucide-react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { supabase } from '../lib/supabase';
 import { Attendance, Meeting } from '../types';
@@ -219,6 +219,20 @@ export default function QRScanner() {
     await refreshAttendance();
   };
 
+  const cancelCheckin = async (staffId: number) => {
+    if (!selectedMeetingId) return;
+    if (!confirm('Bạn có chắc muốn hủy điểm danh của nhân sự này?')) return;
+    const { error } = await supabase.from('attendance')
+      .delete()
+      .eq('meeting_id', selectedMeetingId)
+      .eq('staff_id', staffId);
+    if (error) {
+      alert(error.message || 'Không thể hủy điểm danh.');
+      return;
+    }
+    await refreshAttendance();
+  };
+
   const filteredStaff = staff.filter((item) => item.full_name.toLowerCase().includes(search.toLowerCase()) || (item.staff_code || '').toLowerCase().includes(search.toLowerCase()));
   const checkedCount = attendance.filter(a => a.status !== 'absent').length;
   const totalCount = staff.length;
@@ -325,10 +339,15 @@ export default function QRScanner() {
                   </div>
                 </div>
                 {checked ? (
-                  <span className="badge badge-success !text-[10px]">
-                    <CheckCircle2 size={12} />
-                    Đã điểm danh
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="badge badge-success !text-[10px]">
+                      <CheckCircle2 size={12} />
+                      Đã điểm danh
+                    </span>
+                    <button className="text-red-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded-lg transition-colors border border-transparent hover:border-red-100" title="Hủy điểm danh" onClick={() => cancelCheckin(item.id)}>
+                      <X size={14} />
+                    </button>
+                  </div>
                 ) : (
                   <button className="btn-primary !py-2 !px-4 !text-xs !rounded-lg !shadow-sm" onClick={() => manualCheckin(item.id)}>
                     Điểm danh
@@ -384,11 +403,22 @@ export default function QRScanner() {
                   <div className="text-[10px] text-brand-text/35">{item.department_name || item.neighborhood_name || '--'}</div>
                 </div>
               </div>
-              <div className="text-right">
-                <div className="font-mono text-xs font-semibold">{item.checkin_time ? formatTime(item.checkin_time) : '--:--'}</div>
-                <span className={`badge ${item.status === 'present' ? 'badge-success' : item.status === 'late' ? 'badge-warning' : 'badge-danger'} !text-[9px] !py-0 !px-1.5`}>
-                  {item.status === 'present' ? 'Đúng giờ' : item.status === 'absent' ? 'Vắng' : 'Trễ'}
-                </span>
+              <div className="flex items-center gap-3 text-right">
+                <div>
+                  <div className="font-mono text-xs font-semibold">{item.checkin_time ? formatTime(item.checkin_time) : '--:--'}</div>
+                  <span className={`badge ${item.status === 'present' ? 'badge-success' : item.status === 'late' ? 'badge-warning' : 'badge-danger'} !text-[9px] !py-0 !px-1.5`}>
+                    {item.status === 'present' ? 'Đúng giờ' : item.status === 'absent' ? 'Vắng' : 'Trễ'}
+                  </span>
+                </div>
+                {item.status !== 'absent' && (
+                  <button 
+                    onClick={() => cancelCheckin(item.staff_id)}
+                    className="p-1 px-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-transparent hover:border-red-100" 
+                    title="Hủy điểm danh"
+                  >
+                    <X size={12} />
+                  </button>
+                )}
               </div>
             </div>
           ))}

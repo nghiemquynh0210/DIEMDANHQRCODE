@@ -29,6 +29,7 @@ export default function MeetingManagement() {
   });
   const [isAllStaff, setIsAllStaff] = useState(false);
   const [attendanceFilter, setAttendanceFilter] = useState<'all' | 'present' | 'late' | 'absent'>('all');
+  const [selectedMeetingForAttendance, setSelectedMeetingForAttendance] = useState<Meeting | null>(null);
 
   const token = localStorage.getItem('token');
 
@@ -154,6 +155,7 @@ export default function MeetingManagement() {
   };
 
   const showAttendance = async (meeting: Meeting) => {
+    setSelectedMeetingForAttendance(meeting);
     const { data } = await supabase
       .from('attendance')
       .select('*, staff(full_name, staff_code, departments(name), positions(name), neighborhoods(name))')
@@ -196,6 +198,21 @@ export default function MeetingManagement() {
 
     setAttendance([...mappedAttendance, ...mappedAbsent]);
     setAttendanceTitle(meeting.title);
+  };
+
+  const cancelCheckin = async (staffId: number) => {
+    if (!selectedMeetingForAttendance) return;
+    if (!confirm('Bạn có chắc muốn hủy điểm danh của cán bộ này?')) return;
+    try {
+      const { error } = await supabase.from('attendance').delete().eq('meeting_id', selectedMeetingForAttendance.id).eq('staff_id', staffId);
+      if (error) {
+        alert(error.message);
+        return;
+      }
+      await showAttendance(selectedMeetingForAttendance);
+    } catch (err: any) {
+      alert(err.message);
+    }
   };
 
   const selectMacro = (type: 'heads' | 'deputies') => {
@@ -397,7 +414,7 @@ export default function MeetingManagement() {
                 <option value="late">Trễ ({attendance.filter(a => a.status === 'late').length})</option>
                 <option value="absent">Vắng ({attendance.filter(a => a.status === 'absent').length})</option>
               </select>
-              <button onClick={() => { setAttendanceTitle(''); setAttendance([]); }} className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
+              <button onClick={() => { setAttendanceTitle(''); setAttendance([]); setSelectedMeetingForAttendance(null); }} className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
                 <X size={16} className="text-brand-text/40" />
               </button>
             </div>
@@ -414,11 +431,22 @@ export default function MeetingManagement() {
                     <div className="text-[11px] text-brand-text/40">{item.position_name || '--'} / {item.department_name || item.neighborhood_name || '--'}</div>
                   </div>
                 </div>
-                <div className="text-right">
-                  <div className="font-mono text-sm font-semibold">{item.checkin_time ? formatTime(item.checkin_time) : '--:--'}</div>
-                  <span className={`badge ${item.status === 'present' ? 'badge-success' : item.status === 'late' ? 'badge-warning' : 'badge-danger'} !text-[10px] !py-0.5 !px-2`}>
-                    {item.status === 'present' ? 'Đúng giờ' : item.status === 'late' ? 'Đi trễ' : 'Vắng'}
-                  </span>
+                <div className="flex items-center gap-3 text-right">
+                  <div>
+                    <div className="font-mono text-sm font-semibold">{item.checkin_time ? formatTime(item.checkin_time) : '--:--'}</div>
+                    <span className={`badge ${item.status === 'present' ? 'badge-success' : item.status === 'late' ? 'badge-warning' : 'badge-danger'} !text-[10px] !py-0.5 !px-2`}>
+                      {item.status === 'present' ? 'Đúng giờ' : item.status === 'late' ? 'Đi trễ' : 'Vắng'}
+                    </span>
+                  </div>
+                  {item.status !== 'absent' && (
+                    <button 
+                      onClick={() => cancelCheckin(item.staff_id)}
+                      className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-transparent hover:border-red-100" 
+                      title="Hủy điểm danh"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
