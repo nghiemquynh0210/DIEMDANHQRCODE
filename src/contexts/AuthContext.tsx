@@ -38,7 +38,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       id: supabaseUser.id,
       email: supabaseUser.email || '',
       username: supabaseUser.user_metadata?.full_name || supabaseUser.user_metadata?.username || supabaseUser.email?.split('@')[0] || 'User',
-      role: supabaseUser.user_metadata?.role || 'staff',
+      role: 'staff', // Always default to staff — never trust user_metadata.role
       staff_id: supabaseUser.user_metadata?.staff_id || null,
     };
 
