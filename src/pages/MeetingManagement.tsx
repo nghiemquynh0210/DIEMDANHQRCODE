@@ -24,8 +24,11 @@ export default function MeetingManagement() {
     participant_neighborhood_ids: [] as number[],
     meeting_date: new Date().toISOString().split('T')[0],
     meeting_time: '08:00',
+    meeting_end_time: '11:00',
     location: 'Hội trường UBND phường An Phú',
   });
+  const [isAllStaff, setIsAllStaff] = useState(false);
+  const [attendanceFilter, setAttendanceFilter] = useState<'all' | 'present' | 'late' | 'absent'>('all');
 
   const token = localStorage.getItem('token');
 
@@ -119,7 +122,8 @@ export default function MeetingManagement() {
       
       setShowForm(false);
       setEditing(null);
-      setForm({ title: '', content: '', participant_department_ids: [], participant_position_ids: [], participant_neighborhood_ids: [], meeting_date: new Date().toISOString().split('T')[0], meeting_time: '08:00', location: 'Hội trường UBND phường An Phú' });
+      setIsAllStaff(false);
+      setForm({ title: '', content: '', participant_department_ids: [], participant_position_ids: [], participant_neighborhood_ids: [], meeting_date: new Date().toISOString().split('T')[0], meeting_time: '08:00', meeting_end_time: '11:00', location: 'Hội trường UBND phường An Phú' });
       load();
     } catch (err: any) {
       console.error('Save error:', err);
@@ -194,8 +198,22 @@ export default function MeetingManagement() {
     setAttendanceTitle(meeting.title);
   };
 
+  const selectMacro = (type: 'heads' | 'deputies') => {
+    setIsAllStaff(false);
+    if (type === 'heads') {
+      const headIds = positions.filter(p => {
+        const n = p.name.toLowerCase();
+        return (n.includes('trưởng') && !n.includes('phó')) || (n.includes('bí thư') && !n.includes('phó')) || (n.includes('chủ tịch') && !n.includes('phó')) || n.includes('ủy viên');
+      }).map(p => p.id);
+      setForm(prev => ({ ...prev, participant_position_ids: Array.from(new Set([...prev.participant_position_ids, ...headIds])) }));
+    } else if (type === 'deputies') {
+      const depIds = positions.filter(p => p.name.toLowerCase().includes('phó')).map(p => p.id);
+      setForm(prev => ({ ...prev, participant_position_ids: Array.from(new Set([...prev.participant_position_ids, ...depIds])) }));
+    }
+  };
+
   const getInvitedStaffCount = () => {
-     if (form.participant_department_ids.length === 0 && form.participant_position_ids.length === 0 && form.participant_neighborhood_ids.length === 0) {
+     if (isAllStaff || (form.participant_department_ids.length === 0 && form.participant_position_ids.length === 0 && form.participant_neighborhood_ids.length === 0)) {
         return allStaff.length;
      }
      return allStaff.filter(s => 
@@ -232,14 +250,46 @@ export default function MeetingManagement() {
           <input className="input" placeholder="Tên cuộc họp" value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} required />
           <textarea className="input min-h-[100px]" placeholder="Nội dung" value={form.content} onChange={(event) => setForm({ ...form, content: event.target.value })} />
           <div className="grid grid-cols-2 gap-4">
-            <input className="input" type="date" value={form.meeting_date} onChange={(event) => setForm({ ...form, meeting_date: event.target.value })} required />
-            <input className="input" type="time" value={form.meeting_time} onChange={(event) => setForm({ ...form, meeting_time: event.target.value })} required />
+            <div>
+              <label className="block text-xs font-semibold text-brand-text/50 uppercase mb-1.5 ml-1">Giờ bắt đầu</label>
+              <input className="input" type="time" value={form.meeting_time} onChange={(event) => setForm({ ...form, meeting_time: event.target.value })} required />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-brand-text/50 uppercase mb-1.5 ml-1">Giờ kết thúc</label>
+              <input className="input" type="time" value={form.meeting_end_time || '11:00'} onChange={(event) => setForm({ ...form, meeting_end_time: event.target.value })} required />
+            </div>
+            <div className="col-span-2">
+              <label className="block text-xs font-semibold text-brand-text/50 uppercase mb-1.5 ml-1">Ngày diễn ra</label>
+              <input className="input" type="date" value={form.meeting_date} onChange={(event) => setForm({ ...form, meeting_date: event.target.value })} required />
+            </div>
           </div>
           <input className="input" placeholder="Địa điểm" value={form.location} onChange={(event) => setForm({ ...form, location: event.target.value })} required />
 
-          <Selection title="Phòng ban mời" items={departments} selected={form.participant_department_ids} onToggle={(id) => toggle('participant_department_ids', id)} />
-          <Selection title="Chức danh mời" items={positions} selected={form.participant_position_ids} onToggle={(id) => toggle('participant_position_ids', id)} />
-          <Selection title="Khu phố mời" items={neighborhoods} selected={form.participant_neighborhood_ids} onToggle={(id) => toggle('participant_neighborhood_ids', id)} />
+          <div className="space-y-4 pt-4 border-t border-gray-100">
+            <div className="flex flex-col gap-2">
+              <label className="text-xs font-bold text-brand-text uppercase">Chọn nhanh thành phần tham dự</label>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" onClick={() => setIsAllStaff(true)} className={`badge !py-1.5 !px-3 !rounded-lg text-sm transition-all ${isAllStaff ? 'bg-indigo-600 text-white shadow-md' : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'}`}>Tất cả mọi người</button>
+                <button type="button" onClick={() => selectMacro('heads')} className="badge !py-1.5 !px-3 !rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 text-sm transition-colors">Các Trưởng ban/ngành</button>
+                <button type="button" onClick={() => selectMacro('deputies')} className="badge !py-1.5 !px-3 !rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-sm transition-colors">Các Phó ngành</button>
+                <button type="button" onClick={() => { setIsAllStaff(false); setForm(prev => ({ ...prev, participant_department_ids: [], participant_position_ids: [], participant_neighborhood_ids: [] })) }} className="badge !py-1.5 !px-3 !rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 text-sm transition-colors cursor-pointer">Xóa bộ chọn</button>
+              </div>
+            </div>
+
+            {!isAllStaff ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 rounded-xl border border-gray-100 bg-gray-50/50">
+                <div className="md:col-span-2">
+                  <Selection title="Chức danh mời" items={positions} selected={form.participant_position_ids} onToggle={(id) => toggle('participant_position_ids', id)} />
+                </div>
+                <Selection title="Phòng ban mời" items={departments} selected={form.participant_department_ids} onToggle={(id) => toggle('participant_department_ids', id)} />
+                <Selection title="Khu phố mời" items={neighborhoods} selected={form.participant_neighborhood_ids} onToggle={(id) => toggle('participant_neighborhood_ids', id)} />
+              </div>
+            ) : (
+              <div className="p-4 rounded-xl border border-indigo-200 bg-indigo-50/50 text-sm text-indigo-700">
+                ✔️ Đã cấu hình mời tất cả nhân sự tham gia cuộc họp. Nếu muốn mời thủ công, hãy chọn "Xóa bộ chọn".
+              </div>
+            )}
+          </div>
 
           <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -291,7 +341,22 @@ export default function MeetingManagement() {
               <button className="btn-secondary !py-2 !px-3 !text-xs" onClick={() => showAttendance(item)}>
                 <Users size={14} />Điểm danh
               </button>
-              <button className="btn-secondary !py-2 !px-3 !text-xs" onClick={() => { setEditing(item); setForm({ title: item.title, content: item.content || '', participant_department_ids: item.participant_department_ids || [], participant_position_ids: item.participant_position_ids || [], participant_neighborhood_ids: item.participant_neighborhood_ids || [], meeting_date: item.meeting_date, meeting_time: item.meeting_time, location: item.location }); setShowForm(true); }}>
+              <button className="btn-secondary !py-2 !px-3 !text-xs" onClick={() => { 
+                setEditing(item); 
+                setIsAllStaff(false);
+                setForm({ 
+                  title: item.title, 
+                  content: item.content || '', 
+                  participant_department_ids: item.participant_department_ids || [], 
+                  participant_position_ids: item.participant_position_ids || [], 
+                  participant_neighborhood_ids: item.participant_neighborhood_ids || [], 
+                  meeting_date: item.meeting_date, 
+                  meeting_time: item.meeting_time, 
+                  meeting_end_time: item.meeting_end_time || '11:00',
+                  location: item.location 
+                }); 
+                setShowForm(true); 
+              }}>
                 <Edit2 size={14} />
               </button>
               <button className="btn-secondary !py-2 !px-3 !text-xs !text-red-500 !border-red-200 hover:!bg-red-50" onClick={() => remove(item.id)}>
@@ -325,12 +390,20 @@ export default function MeetingManagement() {
         <div className="card animate-fade-in-up">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-base font-bold text-brand-text">Chi tiết điểm danh: {attendanceTitle}</h3>
-            <button onClick={() => { setAttendanceTitle(''); setAttendance([]); }} className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
-              <X size={16} className="text-brand-text/40" />
-            </button>
+            <div className="flex items-center gap-3">
+              <select className="input !py-1.5 !text-sm w-36" value={attendanceFilter} onChange={(e: any) => setAttendanceFilter(e.target.value)}>
+                <option value="all">Tất cả ({attendance.length})</option>
+                <option value="present">Đúng giờ ({attendance.filter(a => a.status === 'present').length})</option>
+                <option value="late">Trễ ({attendance.filter(a => a.status === 'late').length})</option>
+                <option value="absent">Vắng ({attendance.filter(a => a.status === 'absent').length})</option>
+              </select>
+              <button onClick={() => { setAttendanceTitle(''); setAttendance([]); }} className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
+                <X size={16} className="text-brand-text/40" />
+              </button>
+            </div>
           </div>
           <div className="space-y-2">
-            {attendance.map((item) => (
+            {attendance.filter(item => attendanceFilter === 'all' || item.status === attendanceFilter).map((item) => (
               <div key={item.id} className="p-3.5 rounded-xl bg-brand-bg/60 border border-gray-100 flex items-center justify-between hover:bg-brand-bg transition-colors">
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white text-xs font-bold">
@@ -349,6 +422,9 @@ export default function MeetingManagement() {
                 </div>
               </div>
             ))}
+            {attendance.filter(item => attendanceFilter === 'all' || item.status === attendanceFilter).length === 0 && (
+               <div className="text-center p-6 text-sm text-brand-text/50 font-medium">Không có dữ liệu phù hợp với bộ lọc hiện tại.</div>
+            )}
           </div>
         </div>
       )}

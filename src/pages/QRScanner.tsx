@@ -12,6 +12,7 @@ export default function QRScanner() {
   const [staff, setStaff] = useState<any[]>([]);
   const [search, setSearch] = useState('');
   const [flashId, setFlashId] = useState<number | null>(null);
+  const [attendanceFilter, setAttendanceFilter] = useState<'all' | 'present' | 'late' | 'absent'>('all');
 
   // Camera scanner state
   const [cameraOn, setCameraOn] = useState(false);
@@ -57,7 +58,33 @@ export default function QRScanner() {
       department_name: item.staff?.departments?.name || '--',
       neighborhood_name: item.staff?.neighborhoods?.name || '--',
     }));
-    setAttendance(mapped);
+
+    const meeting = meetings.find(m => String(m.id) === String(selectedMeetingId));
+    let invitedStaff = staff;
+    if (meeting && (meeting.participant_department_ids?.length || meeting.participant_position_ids?.length || meeting.participant_neighborhood_ids?.length)) {
+       invitedStaff = staff.filter(s => 
+         (meeting.participant_department_ids || []).includes(s.department_id) ||
+         (meeting.participant_position_ids || []).includes(s.position_id) ||
+         (meeting.participant_neighborhood_ids || []).includes(s.neighborhood_id)
+       );
+    }
+
+    const attendedIds = new Set(mapped.map((a: any) => a.staff_id));
+    const absentStaff = invitedStaff.filter(s => !attendedIds.has(s.id));
+    const mappedAbsent = absentStaff.map(s => ({
+      id: `absent-${s.id}`,
+      staff_id: s.id,
+      meeting_id: Number(selectedMeetingId),
+      checkin_time: null,
+      status: 'absent' as const,
+      full_name: s.full_name || '--',
+      staff_code: s.staff_code || '--',
+      position_name: s.position_name || '--',
+      department_name: s.department_name || '--',
+      neighborhood_name: s.neighborhood_name || '--',
+    }));
+
+    setAttendance([...mapped, ...mappedAbsent]);
   }, [selectedMeetingId]);
 
   useEffect(() => {
@@ -193,7 +220,7 @@ export default function QRScanner() {
   };
 
   const filteredStaff = staff.filter((item) => item.full_name.toLowerCase().includes(search.toLowerCase()) || (item.staff_code || '').toLowerCase().includes(search.toLowerCase()));
-  const checkedCount = attendance.length;
+  const checkedCount = attendance.filter(a => a.status !== 'absent').length;
   const totalCount = staff.length;
 
   const getInitials = (name: string) => {
@@ -315,14 +342,22 @@ export default function QRScanner() {
 
       {/* Right Panel - History */}
       <div className="lg:col-span-2 card p-0 overflow-hidden flex flex-col">
-        <div className="p-5 border-b border-gray-100 flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center">
-            <History size={16} className="text-primary" />
+        <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center">
+              <History size={16} className="text-primary" />
+            </div>
+            <div>
+              <span className="font-bold text-sm text-brand-text">Danh sách</span>
+              <p className="text-[10px] text-brand-text/35 font-medium">{attendance.filter(a => a.status !== 'absent').length} đã quét</p>
+            </div>
           </div>
-          <div>
-            <span className="font-bold text-sm text-brand-text">Lịch sử điểm danh</span>
-            <p className="text-[10px] text-brand-text/35 font-medium">{attendance.length} lượt</p>
-          </div>
+          <select className="input !py-1 !px-2 !h-8 !text-xs w-28" value={attendanceFilter} onChange={(e: any) => setAttendanceFilter(e.target.value)}>
+            <option value="all">Tất cả ({attendance.length})</option>
+            <option value="present">Đúng giờ ({attendance.filter(a => a.status === 'present').length})</option>
+            <option value="late">Trễ ({attendance.filter(a => a.status === 'late').length})</option>
+            <option value="absent">Vắng ({attendance.filter(a => a.status === 'absent').length})</option>
+          </select>
         </div>
         <div className="flex-1 p-4 space-y-2 overflow-y-auto">
           {attendance.length === 0 && (
@@ -331,14 +366,17 @@ export default function QRScanner() {
               <p className="text-xs font-medium">Chưa có điểm danh</p>
             </div>
           )}
-          {attendance.map((item, index) => (
+          {attendance.filter(item => attendanceFilter === 'all' || item.status === attendanceFilter).length === 0 && (
+            <div className="text-center p-6 text-sm text-brand-text/50 font-medium">Không có dữ liệu phù hợp với bộ lọc.</div>
+          )}
+          {attendance.filter(item => attendanceFilter === 'all' || item.status === attendanceFilter).map((item, index) => (
             <div
               key={item.id}
-              className="p-3.5 rounded-xl bg-brand-bg/50 border border-gray-100 flex items-center justify-between hover:bg-brand-bg transition-colors"
+              className={`p-3.5 rounded-xl border flex items-center justify-between transition-colors ${item.status === 'absent' ? 'bg-red-50/30 border-red-100/50 hover:bg-red-50' : 'bg-brand-bg/50 border-gray-100 hover:bg-brand-bg'}`}
               style={{ animationDelay: `${index * 0.04}s` }}
             >
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center text-indigo-600 text-[10px] font-bold">
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-bold ${item.status === 'absent' ? 'bg-red-100 text-red-600' : 'bg-gradient-to-br from-indigo-100 to-purple-100 text-indigo-600'}`}>
                   {getInitials(item.full_name || '')}
                 </div>
                 <div>
@@ -347,9 +385,9 @@ export default function QRScanner() {
                 </div>
               </div>
               <div className="text-right">
-                <div className="font-mono text-xs font-semibold">{formatTime(item.checkin_time)}</div>
-                <span className={`badge ${item.status === 'present' ? 'badge-success' : 'badge-warning'} !text-[9px] !py-0 !px-1.5`}>
-                  {item.status === 'present' ? 'Đúng giờ' : 'Trễ'}
+                <div className="font-mono text-xs font-semibold">{item.checkin_time ? formatTime(item.checkin_time) : '--:--'}</div>
+                <span className={`badge ${item.status === 'present' ? 'badge-success' : item.status === 'late' ? 'badge-warning' : 'badge-danger'} !text-[9px] !py-0 !px-1.5`}>
+                  {item.status === 'present' ? 'Đúng giờ' : item.status === 'absent' ? 'Vắng' : 'Trễ'}
                 </span>
               </div>
             </div>

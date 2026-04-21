@@ -49,6 +49,7 @@ export interface Meeting {
   participant_neighborhood_ids: number[];
   meeting_date: string;
   meeting_time: string;
+  meeting_end_time?: string;
   location: string;
   created_by?: number | null;
   created_at: string;
