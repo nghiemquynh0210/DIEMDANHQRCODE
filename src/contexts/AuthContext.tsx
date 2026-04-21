@@ -10,6 +10,8 @@ interface AuthUser {
   username: string;
   role: 'admin' | 'staff' | 'viewer';
   staff_id?: number | null;
+  position_name?: string | null;
+  department_name?: string | null;
 }
 
 interface AuthContextType {
@@ -46,13 +48,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     if (supabaseUser.email) {
       const { data: staffRecord } = await supabase
         .from('staff')
-        .select('id, status, full_name')
+        .select('id, status, full_name, positions:position_id(name), departments:department_id(name), party_positions:party_position_id(name), party_departments:party_department_id(name)')
         .eq('email', supabaseUser.email)
         .maybeSingle();
 
       if (staffRecord) {
         baseUser.staff_id = staffRecord.id;
         baseUser.username = staffRecord.full_name || baseUser.username;
+        baseUser.position_name = (staffRecord as any).positions?.name || (staffRecord as any).party_positions?.name || null;
+        baseUser.department_name = (staffRecord as any).departments?.name || (staffRecord as any).party_departments?.name || null;
         // If staff status is 'admin', override role to admin
         if (staffRecord.status === 'admin') {
           baseUser.role = 'admin';

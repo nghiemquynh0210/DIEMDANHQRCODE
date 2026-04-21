@@ -152,8 +152,13 @@ export default function SelfCheckin() {
                   border: '1px solid #C7D2FE',
                   marginBottom: 20,
                 }}>
-                  <p style={{ fontSize: 12, color: '#6366F1', fontWeight: 600, marginBottom: 2 }}>Xin chào</p>
-                  <p style={{ fontSize: 18, fontWeight: 800, color: '#1F2937', margin: 0 }}>{user?.username}</p>
+                  <p style={{ fontSize: 12, color: '#6366F1', fontWeight: 600, marginBottom: 2 }}>Xin chào đồng chí</p>
+                  {user?.position_name && (
+                    <p style={{ fontSize: 14, color: '#4F46E5', fontWeight: 700, marginBottom: 2 }}>
+                      {user.position_name}{user.department_name ? ` ${user.department_name}` : ''}
+                    </p>
+                  )}
+                  <p style={{ fontSize: 20, fontWeight: 800, color: '#1F2937', margin: 0 }}>{user?.username}</p>
                 </div>
 
                 <div className="space-y-3 mb-6">
