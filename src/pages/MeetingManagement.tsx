@@ -154,7 +154,7 @@ export default function MeetingManagement() {
     setSelectedMeetingForAttendance(meeting);
     const { data } = await supabase
       .from('attendance')
-      .select('*, staff(full_name, staff_code, departments(name), positions(name))')
+      .select('*, staff(full_name, staff_code, departments:department_id(name), positions:position_id(name))')
       .eq('meeting_id', meeting.id)
       .order('checkin_time', { ascending: false });
 

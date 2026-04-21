@@ -47,7 +47,7 @@ export default function QRScanner() {
   const refreshAttendance = useCallback(async () => {
     if (!selectedMeetingId) return;
     const { data } = await supabase.from('attendance')
-      .select('*, staff(full_name, staff_code, departments(name), positions(name))')
+      .select('*, staff!inner(full_name, staff_code, departments:department_id(name), positions:position_id(name))')
       .eq('meeting_id', selectedMeetingId)
       .order('checkin_time', { ascending: false });
       
