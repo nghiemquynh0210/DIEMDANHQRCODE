@@ -36,6 +36,11 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     storage: dualStorage,
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: true
+    detectSessionInUrl: true,
+    flowType: 'implicit',
+    // Disable Web Locks API to prevent orphaned lock deadlocks after logout
+    lock: async (name: string, acquireTimeout: number, fn: () => Promise<any>) => {
+      return fn();
+    },
   }
 });
