@@ -31,7 +31,6 @@ export default function MeetingManagement() {
   const [attendanceFilter, setAttendanceFilter] = useState<'all' | 'present' | 'late' | 'absent'>('all');
   const [selectedMeetingForAttendance, setSelectedMeetingForAttendance] = useState<Meeting | null>(null);
 
-  const token = localStorage.getItem('token');
 
   const load = async () => {
     try {

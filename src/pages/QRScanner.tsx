@@ -85,7 +85,7 @@ export default function QRScanner() {
     }));
 
     setAttendance([...mapped, ...mappedAbsent]);
-  }, [selectedMeetingId]);
+  }, [selectedMeetingId, meetings, staff]);
 
   useEffect(() => {
     refreshAttendance();
@@ -200,7 +200,7 @@ export default function QRScanner() {
   }, []);
 
   const manualCheckin = async (staffId: number) => {
-    const alreadyChecked = attendance.some(a => String(a.staff_id) === String(staffId));
+    const alreadyChecked = attendance.some(a => String(a.staff_id) === String(staffId) && a.status !== 'absent');
     if (alreadyChecked) return;
 
     const { error } = await supabase.from('attendance').insert({
