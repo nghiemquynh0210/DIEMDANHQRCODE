@@ -72,17 +72,34 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session);
       if (session?.user) {
-        const resolved = await resolveUser(session.user);
-        setUser(resolved);
+        try {
+          const resolved = await resolveUser(session.user);
+          setUser(resolved);
+        } catch (err) {
+          console.error('Failed to resolve user from session:', err);
+          setUser(null);
+        }
+      } else {
+        setUser(null);
       }
+      setLoading(false);
+    }).catch((err) => {
+      console.error('getSession failed:', err);
+      setSession(null);
+      setUser(null);
       setLoading(false);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setSession(session);
       if (session?.user) {
-        const resolved = await resolveUser(session.user);
-        setUser(resolved);
+        try {
+          const resolved = await resolveUser(session.user);
+          setUser(resolved);
+        } catch (err) {
+          console.error('Failed to resolve user on state change:', err);
+          setUser(null);
+        }
       } else {
         setUser(null);
       }
@@ -93,7 +110,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch (err) {
+      console.error('signOut error:', err);
+    }
+    // Always clear local state regardless of signOut success
+    setSession(null);
+    setUser(null);
+    setLoading(false);
   };
 
   return (
