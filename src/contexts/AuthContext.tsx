@@ -35,29 +35,55 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Remove Vietnamese diacritics from a string
+  const removeDiacritics = (str: string): string => {
+    return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/đ/g, 'd').replace(/Đ/g, 'D');
+  };
+
+  // Convert full name to email: "Nghiêm Xuân Quỳnh" → "nghiemxuanquynh@ubndanphu.com"
+  const nameToEmail = (name: string): string => {
+    return removeDiacritics(name).toLowerCase().replace(/\s+/g, '') + '@ubndanphu.com';
+  };
+
   const resolveUser = async (supabaseUser: User) => {
     const baseUser: AuthUser = {
       id: supabaseUser.id,
       email: supabaseUser.email || '',
       username: supabaseUser.user_metadata?.full_name || supabaseUser.user_metadata?.username || supabaseUser.email?.split('@')[0] || 'User',
-      role: 'staff', // Always default to staff — never trust user_metadata.role
+      role: 'staff',
       staff_id: supabaseUser.user_metadata?.staff_id || null,
     };
 
-    // Check if this user has been promoted to admin via staff table
     if (supabaseUser.email) {
-      const { data: staffRecord } = await supabase
+      // Step 1: Try exact email match
+      let { data: staffRecord } = await supabase
         .from('staff')
         .select('id, status, full_name, positions:position_id(name), departments:department_id(name), party_positions:party_position_id(name), party_departments:party_department_id(name)')
         .eq('email', supabaseUser.email)
         .maybeSingle();
+
+      // Step 2: If no match, try auto-matching by converting staff names to email format
+      if (!staffRecord) {
+        const { data: allStaff } = await supabase
+          .from('staff')
+          .select('id, status, full_name, email, positions:position_id(name), departments:department_id(name), party_positions:party_position_id(name), party_departments:party_department_id(name)');
+
+        if (allStaff) {
+          const match = allStaff.find((s: any) => nameToEmail(s.full_name) === supabaseUser.email!.toLowerCase());
+          if (match) {
+            staffRecord = match;
+            // Auto-save the email link for future fast lookups
+            await supabase.from('staff').update({ email: supabaseUser.email }).eq('id', match.id);
+          }
+        }
+      }
 
       if (staffRecord) {
         baseUser.staff_id = staffRecord.id;
         baseUser.username = staffRecord.full_name || baseUser.username;
         baseUser.position_name = (staffRecord as any).positions?.name || (staffRecord as any).party_positions?.name || null;
         baseUser.department_name = (staffRecord as any).departments?.name || (staffRecord as any).party_departments?.name || null;
-        // If staff status is 'admin', override role to admin
         if (staffRecord.status === 'admin') {
           baseUser.role = 'admin';
         }
