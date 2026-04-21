@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Building2, Check, Flag, Landmark, Pencil, Plus, Shapes, Trash2, Users, X } from 'lucide-react';
+import { Building2, Check, Flag, Landmark, Pencil, Plus, Shapes, Trash2, Users, X, AlertTriangle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Department, Position } from '../types';
 
@@ -27,6 +27,20 @@ export default function DepartmentManagement({
   const [editingId, setEditingId] = useState<{ table: string; id: number } | null>(null);
   const [editingName, setEditingName] = useState('');
 
+  // Delete confirmation modal state
+  const [deleteTarget, setDeleteTarget] = useState<{ table: string; id: number; name: string } | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [showForceDelete, setShowForceDelete] = useState(false);
+
+  // Toast notification state
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  };
+
   const load = async () => {
     const [{ data: a }, { data: b }] = await Promise.all([
       supabase.from('departments').select('*').order('name'),
@@ -45,44 +59,86 @@ export default function DepartmentManagement({
   const addDept = async () => {
     if (!newDept.trim()) return;
     const { error } = await supabase.from('departments').insert({ name: newDept.trim(), org_type: activeTab });
-    if (error) { console.error(error); alert('Lỗi khi thêm đơn vị: ' + error.message); return; }
+    if (error) { console.error(error); showToast('Lỗi khi thêm đơn vị: ' + error.message, 'error'); return; }
     setNewDept('');
     load();
   };
   const addPos = async () => {
     if (!newPos.trim()) return;
     const { error } = await supabase.from('positions').insert({ name: newPos.trim(), org_type: activeTab });
-    if (error) { console.error(error); alert('Lỗi khi thêm chức vụ: ' + error.message); return; }
+    if (error) { console.error(error); showToast('Lỗi khi thêm chức vụ: ' + error.message, 'error'); return; }
     setNewPos('');
     load();
   };
 
-  const remove = async (table: string, id: number) => {
-    if (!confirm('Xác nhận xóa?')) return;
+  // Step 1: user clicks delete → show confirmation modal
+  const requestDelete = (table: string, id: number, name: string) => {
+    setDeleteTarget({ table, id, name });
+    setDeleteError(null);
+    setShowForceDelete(false);
+  };
+
+  // Step 2: user confirms → attempt delete
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleteLoading(true);
+    setDeleteError(null);
+
+    const { table, id } = deleteTarget;
     const { error } = await supabase.from(table).delete().eq('id', id);
+
     if (error) {
       if (error.code === '23503') {
-        const forceDecouple = confirm('CẢNH BÁO: Đang có nhân sự giữ chức vụ hoặc công tác tại đơn vị này! Bạn có muốn gỡ bỏ chức vụ/đơn vị này khỏi các nhân sự đó để tiếp tục xóa không?');
-        if (forceDecouple) {
-           if (table === 'positions') {
-             await supabase.from('staff').update({ position_id: null }).eq('position_id', id);
-             await supabase.from('staff').update({ party_position_id: null }).eq('party_position_id', id);
-           } else if (table === 'departments') {
-             await supabase.from('staff').update({ department_id: null }).eq('department_id', id);
-             await supabase.from('staff').update({ party_department_id: null }).eq('party_department_id', id);
-           }
-           const { error: finalErr } = await supabase.from(table).delete().eq('id', id);
-           if (finalErr) { alert('Vẫn báo lỗi sau khi gỡ: ' + finalErr.message); return; }
-        } else {
-           return;
-        }
+        // Foreign key constraint — ask user to force-decouple
+        setShowForceDelete(true);
+        setDeleteError('Đang có nhân sự giữ chức vụ hoặc công tác tại đơn vị này.');
+        setDeleteLoading(false);
+        return;
       } else {
-        console.error(error);
-        alert('Lỗi khi xóa: ' + error.message);
+        setDeleteError('Lỗi khi xóa: ' + error.message);
+        setDeleteLoading(false);
         return;
       }
     }
+
+    showToast(`Đã xóa "${deleteTarget.name}" thành công!`);
+    setDeleteTarget(null);
+    setDeleteLoading(false);
     load();
+  };
+
+  // Step 3 (optional): user force-decouples staff then deletes
+  const forceDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleteLoading(true);
+
+    const { table, id } = deleteTarget;
+    if (table === 'positions') {
+      await supabase.from('staff').update({ position_id: null }).eq('position_id', id);
+      await supabase.from('staff').update({ party_position_id: null }).eq('party_position_id', id);
+    } else if (table === 'departments') {
+      await supabase.from('staff').update({ department_id: null }).eq('department_id', id);
+      await supabase.from('staff').update({ party_department_id: null }).eq('party_department_id', id);
+    }
+
+    const { error: finalErr } = await supabase.from(table).delete().eq('id', id);
+    if (finalErr) {
+      setDeleteError('Vẫn báo lỗi sau khi gỡ: ' + finalErr.message);
+      setDeleteLoading(false);
+      return;
+    }
+
+    showToast(`Đã xóa "${deleteTarget.name}" thành công!`);
+    setDeleteTarget(null);
+    setDeleteLoading(false);
+    setShowForceDelete(false);
+    load();
+  };
+
+  const cancelDelete = () => {
+    setDeleteTarget(null);
+    setDeleteError(null);
+    setShowForceDelete(false);
   };
 
   const startEdit = (table: string, id: number, name: string) => {
@@ -100,7 +156,7 @@ export default function DepartmentManagement({
     const { error } = await supabase.from(editingId.table).update({ name: editingName.trim() }).eq('id', editingId.id);
     if (error) {
       console.error(error);
-      alert('Lỗi khi lưu: ' + error.message);
+      showToast('Lỗi khi lưu: ' + error.message, 'error');
       return;
     }
     cancelEdit();
@@ -143,7 +199,7 @@ export default function DepartmentManagement({
             <button className="p-1.5 text-amber-500 hover:bg-amber-50 rounded-lg" title="Sửa" onClick={() => startEdit(table, item.id, item.name)}>
               <Pencil size={13} />
             </button>
-            <button className="p-1.5 text-red-400 hover:bg-red-50 rounded-lg" title="Xóa" onClick={() => remove(table, item.id)}>
+            <button className="p-1.5 text-red-400 hover:bg-red-50 rounded-lg" title="Xóa" onClick={() => requestDelete(table, item.id, item.name)}>
               <Trash2 size={13} />
             </button>
           </div>
@@ -164,7 +220,7 @@ export default function DepartmentManagement({
         </div>
       </div>
 
-      {/* 3 Tabs */}
+      {/* 2 Tabs */}
       <div className="flex gap-1.5 p-1 bg-gray-100 rounded-xl">
         {(['party', 'government'] as OrgTab[]).map(tab => {
           const t = TAB_CONFIG[tab];
@@ -224,6 +280,74 @@ export default function DepartmentManagement({
           </div>
         </div>
       </div>
+
+      {/* ── DELETE CONFIRMATION MODAL ── */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 p-6 animate-fade-in-up">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center">
+                <AlertTriangle size={20} className="text-red-500" />
+              </div>
+              <div>
+                <h3 className="font-bold text-brand-text">Xác nhận xóa</h3>
+                <p className="text-xs text-brand-text/50">Hành động này không thể hoàn tác</p>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-red-50 border border-red-100 mb-4">
+              <p className="text-sm text-brand-text">
+                Bạn có chắc chắn muốn xóa <strong>"{deleteTarget.name}"</strong>?
+              </p>
+            </div>
+
+            {deleteError && (
+              <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 mb-4">
+                <p className="text-sm text-amber-800 font-medium">{deleteError}</p>
+                {showForceDelete && (
+                  <p className="text-xs text-amber-600 mt-1">Bạn có muốn gỡ bỏ chức vụ/đơn vị này khỏi các nhân sự để tiếp tục xóa?</p>
+                )}
+              </div>
+            )}
+
+            <div className="flex gap-2 justify-end">
+              <button
+                className="btn-secondary !py-2 !px-4 !text-sm"
+                onClick={cancelDelete}
+                disabled={deleteLoading}
+              >
+                Hủy
+              </button>
+              {showForceDelete ? (
+                <button
+                  className="btn-primary !py-2 !px-4 !text-sm !bg-red-500 hover:!bg-red-600"
+                  onClick={forceDelete}
+                  disabled={deleteLoading}
+                >
+                  {deleteLoading ? 'Đang xóa...' : 'Gỡ nhân sự & Xóa'}
+                </button>
+              ) : (
+                <button
+                  className="btn-primary !py-2 !px-4 !text-sm !bg-red-500 hover:!bg-red-600"
+                  onClick={confirmDelete}
+                  disabled={deleteLoading}
+                >
+                  {deleteLoading ? 'Đang xóa...' : 'Xóa'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── TOAST NOTIFICATION ── */}
+      {toast && (
+        <div className={`fixed bottom-6 right-6 z-50 px-5 py-3 rounded-xl shadow-lg text-sm font-medium text-white animate-fade-in-up ${
+          toast.type === 'success' ? 'bg-emerald-500' : 'bg-red-500'
+        }`}>
+          {toast.message}
+        </div>
+      )}
     </div>
   );
 }
