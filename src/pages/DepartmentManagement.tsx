@@ -283,14 +283,14 @@ export default function DepartmentManagement({
 
       {/* ── DELETE CONFIRMATION MODAL ── */}
       {deleteTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 p-6 animate-fade-in-up">
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)' }}>
+          <div style={{ backgroundColor: 'white', borderRadius: '16px', boxShadow: '0 25px 50px rgba(0,0,0,0.25)', width: '420px', maxWidth: '90vw', padding: '24px' }}>
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center shrink-0">
                 <AlertTriangle size={20} className="text-red-500" />
               </div>
               <div>
-                <h3 className="font-bold text-brand-text">Xác nhận xóa</h3>
+                <h3 className="font-bold text-brand-text text-base">Xác nhận xóa</h3>
                 <p className="text-xs text-brand-text/50">Hành động này không thể hoàn tác</p>
               </div>
             </div>
