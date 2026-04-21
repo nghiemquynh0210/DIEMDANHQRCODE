@@ -1,9 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { Building2, Flag, Landmark, MapPinned, Plus, Shapes, Trash2, Users, X } from 'lucide-react';
+import { Building2, Flag, GraduationCap, Landmark, MapPinned, Plus, Shapes, Trash2, Users } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Department, Neighborhood, Position } from '../types';
 
-type OrgTab = 'party' | 'government';
+type OrgTab = 'party' | 'government' | 'school';
+
+const TAB_CONFIG = {
+  party:      { label: 'Đảng ủy',    icon: Flag,          deptLabel: 'Chi bộ / Đơn vị Đảng', posLabel: 'Chức vụ Đảng',       deptPH: 'VD: Chi bộ cơ quan...',     posPH: 'VD: Bí thư, Phó BT...',     color: 'red',     gradient: 'from-red-500 to-rose-500',     posGradient: 'from-orange-500 to-amber-500' },
+  government: { label: 'Chính quyền', icon: Landmark,      deptLabel: 'Phòng ban / Đơn vị CQ', posLabel: 'Chức vụ Chính quyền', deptPH: 'VD: Văn phòng UBND...',     posPH: 'VD: Chủ tịch, Trưởng KP...', color: 'indigo',  gradient: 'from-indigo-500 to-purple-500', posGradient: 'from-cyan-500 to-blue-500' },
+  school:     { label: 'Nhà trường',  icon: GraduationCap, deptLabel: 'Trường / Đơn vị GD',    posLabel: 'Chức vụ Nhà trường', deptPH: 'VD: Trường TH An Phú...',  posPH: 'VD: Hiệu trưởng, GV...',    color: 'emerald', gradient: 'from-emerald-500 to-teal-500',  posGradient: 'from-lime-500 to-green-500' },
+};
 
 export default function DepartmentManagement({
   onNavigateToStaff,
@@ -32,6 +38,7 @@ export default function DepartmentManagement({
 
   useEffect(() => { load(); }, []);
 
+  const cfg = TAB_CONFIG[activeTab];
   const filteredDepts = departments.filter(d => d.org_type === activeTab);
   const filteredPositions = positions.filter(p => p.org_type === activeTab);
 
@@ -62,194 +69,127 @@ export default function DepartmentManagement({
     load();
   };
 
-  const isParty = activeTab === 'party';
-  const tabColor = isParty ? 'red' : 'indigo';
-  const deptLabel = isParty ? 'Chi bộ / Đơn vị Đảng' : 'Phòng ban / Đơn vị CQ';
-  const posLabel = isParty ? 'Chức vụ Đảng' : 'Chức vụ Chính quyền';
-
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center gap-3 mb-2">
         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white shadow-lg shadow-indigo-500/15">
           <Building2 size={20} />
         </div>
         <div>
           <h2 className="text-lg font-bold text-brand-text">Cơ cấu tổ chức</h2>
-          <p className="text-[11px] text-brand-text/40 font-medium">Quản lý đơn vị, chức vụ Đảng ủy & Chính quyền</p>
+          <p className="text-[11px] text-brand-text/40 font-medium">Quản lý đơn vị, chức vụ Đảng ủy, Chính quyền & Nhà trường</p>
         </div>
       </div>
 
-      {/* Tabs: Đảng ủy / UBND */}
-      <div className="flex gap-2 p-1 bg-gray-100 rounded-xl">
-        <button
-          onClick={() => setActiveTab('party')}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg font-bold text-sm transition-all ${
-            activeTab === 'party'
-              ? 'bg-white text-red-600 shadow-sm border border-red-100'
-              : 'text-brand-text/50 hover:text-brand-text/70'
-          }`}
-        >
-          <Flag size={16} />
-          Đảng ủy
-        </button>
-        <button
-          onClick={() => setActiveTab('government')}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg font-bold text-sm transition-all ${
-            activeTab === 'government'
-              ? 'bg-white text-indigo-600 shadow-sm border border-indigo-100'
-              : 'text-brand-text/50 hover:text-brand-text/70'
-          }`}
-        >
-          <Landmark size={16} />
-          Chính quyền (UBND)
-        </button>
+      {/* 3 Tabs */}
+      <div className="flex gap-1.5 p-1 bg-gray-100 rounded-xl">
+        {(['party', 'government', 'school'] as OrgTab[]).map(tab => {
+          const t = TAB_CONFIG[tab];
+          const Icon = t.icon;
+          const isActive = activeTab === tab;
+          const colorMap: Record<string, string> = { red: 'text-red-600 border-red-100', indigo: 'text-indigo-600 border-indigo-100', emerald: 'text-emerald-600 border-emerald-100' };
+          return (
+            <button key={tab} onClick={() => setActiveTab(tab)}
+              className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg font-bold text-sm transition-all ${
+                isActive ? `bg-white ${colorMap[t.color]} shadow-sm border` : 'text-brand-text/50 hover:text-brand-text/70'
+              }`}>
+              <Icon size={16} />{t.label}
+            </button>
+          );
+        })}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-
-        {/* ── ĐƠN VỊ (filtered by org_type) ── */}
+        {/* ── ĐƠN VỊ ── */}
         <div className="card-no-hover flex flex-col">
           <div className="flex items-center gap-2.5 mb-4 pb-3 border-b border-gray-100">
-            <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${isParty ? 'from-red-500 to-rose-500' : 'from-indigo-500 to-purple-500'} flex items-center justify-center text-white`}>
+            <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${cfg.gradient} flex items-center justify-center text-white`}>
               <Building2 size={16} />
             </div>
             <div>
-              <h3 className="font-bold text-sm text-brand-text">{deptLabel}</h3>
+              <h3 className="font-bold text-sm text-brand-text">{cfg.deptLabel}</h3>
               <p className="text-[10px] text-brand-text/35 font-medium">{filteredDepts.length} đơn vị</p>
             </div>
           </div>
-
           <div className="flex gap-2 mb-3">
-            <input
-              className="input text-sm flex-1"
-              placeholder={isParty ? 'VD: Chi bộ Khối cơ quan...' : 'VD: Văn phòng UBND...'}
-              value={newDept}
-              onChange={e => setNewDept(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && addDept()}
-            />
-            <button onClick={addDept} className={`btn-primary !py-2 !px-3 !rounded-lg shrink-0 ${isParty ? '!from-red-500 !to-rose-500' : ''}`}>
-              <Plus size={16} />
-            </button>
+            <input className="input text-sm flex-1" placeholder={cfg.deptPH} value={newDept} onChange={e => setNewDept(e.target.value)} onKeyDown={e => e.key === 'Enter' && addDept()} />
+            <button onClick={addDept} className={`btn-primary !py-2 !px-3 !rounded-lg shrink-0 !${cfg.gradient}`}><Plus size={16} /></button>
           </div>
-
           <div className="flex-1 space-y-1.5 overflow-y-auto max-h-[400px] pr-1">
             {filteredDepts.map((item) => (
-              <div key={item.id} className={`flex items-center justify-between p-2.5 rounded-xl border border-gray-100 hover:border-${tabColor}-200 hover:bg-${tabColor}-50/30 group transition-all`}>
+              <div key={item.id} className="flex items-center justify-between p-2.5 rounded-xl border border-gray-100 hover:bg-gray-50 group transition-all">
                 <div className="flex items-center gap-2.5 flex-1 min-w-0">
-                  <div className={`w-7 h-7 rounded-lg ${isParty ? 'bg-red-50 text-red-600' : 'bg-indigo-50 text-indigo-600'} flex items-center justify-center text-[10px] font-bold shrink-0`}>
+                  <div className={`w-7 h-7 rounded-lg bg-${cfg.color}-50 text-${cfg.color}-600 flex items-center justify-center text-[10px] font-bold shrink-0`}>
                     {item.name.charAt(0)}
                   </div>
                   <span className="text-sm font-medium text-brand-text truncate">{item.name}</span>
                 </div>
                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button className={`p-1.5 ${isParty ? 'text-red-500 hover:bg-red-50' : 'text-indigo-500 hover:bg-indigo-50'} rounded-lg`} title="Xem nhân sự" onClick={() => onNavigateToStaff({ departmentId: String(item.id) })}>
-                    <Users size={13} />
-                  </button>
-                  <button className="p-1.5 text-red-400 hover:bg-red-50 rounded-lg" onClick={() => remove('departments', item.id)}>
-                    <Trash2 size={13} />
-                  </button>
+                  <button className={`p-1.5 text-${cfg.color}-500 hover:bg-${cfg.color}-50 rounded-lg`} title="Xem nhân sự" onClick={() => onNavigateToStaff({ departmentId: String(item.id) })}><Users size={13} /></button>
+                  <button className="p-1.5 text-red-400 hover:bg-red-50 rounded-lg" onClick={() => remove('departments', item.id)}><Trash2 size={13} /></button>
                 </div>
               </div>
             ))}
-            {filteredDepts.length === 0 && (
-              <p className="text-center text-brand-text/30 text-xs py-6">Chưa có đơn vị {isParty ? 'Đảng' : 'CQ'}</p>
-            )}
+            {filteredDepts.length === 0 && (<p className="text-center text-brand-text/30 text-xs py-6">Chưa có đơn vị</p>)}
           </div>
         </div>
 
-        {/* ── CHỨC VỤ (filtered by org_type) ── */}
+        {/* ── CHỨC VỤ ── */}
         <div className="card-no-hover flex flex-col">
           <div className="flex items-center gap-2.5 mb-4 pb-3 border-b border-gray-100">
-            <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${isParty ? 'from-orange-500 to-amber-500' : 'from-cyan-500 to-blue-500'} flex items-center justify-center text-white`}>
-              <Shapes size={16} />
-            </div>
+            <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${cfg.posGradient} flex items-center justify-center text-white`}><Shapes size={16} /></div>
             <div>
-              <h3 className="font-bold text-sm text-brand-text">{posLabel}</h3>
+              <h3 className="font-bold text-sm text-brand-text">{cfg.posLabel}</h3>
               <p className="text-[10px] text-brand-text/35 font-medium">{filteredPositions.length} chức danh</p>
             </div>
           </div>
-
           <div className="flex gap-2 mb-3">
-            <input
-              className="input text-sm flex-1"
-              placeholder={isParty ? 'VD: Bí thư, Phó BT...' : 'VD: Chủ tịch, Trưởng phòng...'}
-              value={newPos}
-              onChange={e => setNewPos(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && addPos()}
-            />
-            <button onClick={addPos} className={`btn-primary !py-2 !px-3 !rounded-lg shrink-0 ${isParty ? '!from-orange-500 !to-amber-500' : '!from-cyan-500 !to-blue-500'}`}>
-              <Plus size={16} />
-            </button>
+            <input className="input text-sm flex-1" placeholder={cfg.posPH} value={newPos} onChange={e => setNewPos(e.target.value)} onKeyDown={e => e.key === 'Enter' && addPos()} />
+            <button onClick={addPos} className={`btn-primary !py-2 !px-3 !rounded-lg shrink-0 !${cfg.posGradient}`}><Plus size={16} /></button>
           </div>
-
           <div className="flex-1 space-y-1.5 overflow-y-auto max-h-[400px] pr-1">
             {filteredPositions.map((item) => (
-              <div key={item.id} className={`flex items-center justify-between p-2.5 rounded-xl border border-gray-100 hover:border-${isParty ? 'orange' : 'cyan'}-200 hover:bg-${isParty ? 'orange' : 'cyan'}-50/30 group transition-all`}>
+              <div key={item.id} className="flex items-center justify-between p-2.5 rounded-xl border border-gray-100 hover:bg-gray-50 group transition-all">
                 <div className="flex items-center gap-2.5 flex-1 min-w-0">
-                  <div className={`w-7 h-7 rounded-lg ${isParty ? 'bg-orange-50 text-orange-600' : 'bg-cyan-50 text-cyan-600'} flex items-center justify-center text-[10px] font-bold shrink-0`}>
+                  <div className={`w-7 h-7 rounded-lg bg-${cfg.color}-50 text-${cfg.color}-600 flex items-center justify-center text-[10px] font-bold shrink-0`}>
                     {item.name.charAt(0)}
                   </div>
                   <span className="text-sm font-medium text-brand-text truncate">{item.name}</span>
                 </div>
-                <button className="p-1.5 text-red-400 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => remove('positions', item.id)}>
-                  <Trash2 size={13} />
-                </button>
+                <button className="p-1.5 text-red-400 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => remove('positions', item.id)}><Trash2 size={13} /></button>
               </div>
             ))}
-            {filteredPositions.length === 0 && (
-              <p className="text-center text-brand-text/30 text-xs py-6">Chưa có chức vụ {isParty ? 'Đảng' : 'CQ'}</p>
-            )}
+            {filteredPositions.length === 0 && (<p className="text-center text-brand-text/30 text-xs py-6">Chưa có chức vụ</p>)}
           </div>
         </div>
 
         {/* ── KHU PHỐ (shared) ── */}
         <div className="card-no-hover flex flex-col">
           <div className="flex items-center gap-2.5 mb-4 pb-3 border-b border-gray-100">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center text-white">
-              <MapPinned size={16} />
-            </div>
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-white"><MapPinned size={16} /></div>
             <div>
               <h3 className="font-bold text-sm text-brand-text">Khu phố</h3>
               <p className="text-[10px] text-brand-text/35 font-medium">{neighborhoods.length} khu phố</p>
             </div>
           </div>
-
           <div className="flex gap-2 mb-3">
-            <input
-              className="input text-sm flex-1"
-              placeholder="Tên khu phố mới..."
-              value={newNb}
-              onChange={e => setNewNb(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && addNb()}
-            />
-            <button onClick={addNb} className="btn-primary !py-2 !px-3 !rounded-lg shrink-0 !from-emerald-500 !to-teal-500">
-              <Plus size={16} />
-            </button>
+            <input className="input text-sm flex-1" placeholder="Tên khu phố mới..." value={newNb} onChange={e => setNewNb(e.target.value)} onKeyDown={e => e.key === 'Enter' && addNb()} />
+            <button onClick={addNb} className="btn-primary !py-2 !px-3 !rounded-lg shrink-0 !from-violet-500 !to-fuchsia-500"><Plus size={16} /></button>
           </div>
-
           <div className="flex-1 space-y-1.5 overflow-y-auto max-h-[400px] pr-1">
             {neighborhoods.map((item) => (
-              <div key={item.id} className="flex items-center justify-between p-2.5 rounded-xl border border-gray-100 hover:border-emerald-200 hover:bg-emerald-50/30 group transition-all">
+              <div key={item.id} className="flex items-center justify-between p-2.5 rounded-xl border border-gray-100 hover:border-violet-200 hover:bg-violet-50/30 group transition-all">
                 <div className="flex items-center gap-2.5 flex-1 min-w-0">
-                  <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center text-[10px] font-bold shrink-0">
-                    {item.name.charAt(0)}
-                  </div>
+                  <div className="w-7 h-7 rounded-lg bg-violet-50 text-violet-600 flex items-center justify-center text-[10px] font-bold shrink-0">{item.name.charAt(0)}</div>
                   <span className="text-sm font-medium text-brand-text truncate">{item.name}</span>
                 </div>
                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button className="p-1.5 text-emerald-500 hover:bg-emerald-50 rounded-lg" title="Xem nhân sự" onClick={() => onNavigateToStaff({ neighborhoodId: String(item.id) })}>
-                    <Users size={13} />
-                  </button>
-                  <button className="p-1.5 text-red-400 hover:bg-red-50 rounded-lg" onClick={() => remove('neighborhoods', item.id)}>
-                    <Trash2 size={13} />
-                  </button>
+                  <button className="p-1.5 text-violet-500 hover:bg-violet-50 rounded-lg" title="Xem nhân sự" onClick={() => onNavigateToStaff({ neighborhoodId: String(item.id) })}><Users size={13} /></button>
+                  <button className="p-1.5 text-red-400 hover:bg-red-50 rounded-lg" onClick={() => remove('neighborhoods', item.id)}><Trash2 size={13} /></button>
                 </div>
               </div>
             ))}
-            {neighborhoods.length === 0 && (
-              <p className="text-center text-brand-text/30 text-xs py-6">Chưa có khu phố</p>
-            )}
+            {neighborhoods.length === 0 && (<p className="text-center text-brand-text/30 text-xs py-6">Chưa có khu phố</p>)}
           </div>
         </div>
       </div>

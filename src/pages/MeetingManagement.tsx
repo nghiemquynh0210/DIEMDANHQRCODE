@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Calendar, Clock, Edit2, Flag, Landmark, MapPin, Plus, QrCode, Trash2, Users, X, ChevronDown, ChevronUp } from 'lucide-react';
+import { Calendar, Clock, Edit2, Flag, GraduationCap, Landmark, MapPin, Plus, QrCode, Trash2, Users, X, ChevronDown, ChevronUp } from 'lucide-react';
 import QRCode from 'qrcode';
 import { supabase } from '../lib/supabase';
 import { Department, Meeting, Neighborhood, Position } from '../types';
@@ -46,7 +46,7 @@ export default function MeetingManagement() {
         supabase.from('departments').select('*'),
         supabase.from('positions').select('*'),
         supabase.from('neighborhoods').select('*'),
-        supabase.from('staff').select('id, department_id, position_id, party_department_id, party_position_id, neighborhood_id, full_name, staff_code, departments:department_id(name), positions:position_id(name), party_departments:party_department_id(name), party_positions:party_position_id(name), neighborhoods(name)').eq('status', 'active'),
+        supabase.from('staff').select('id, department_id, position_id, party_department_id, party_position_id, school_department_id, school_position_id, neighborhood_id, full_name, staff_code, departments:department_id(name), positions:position_id(name), party_departments:party_department_id(name), party_positions:party_position_id(name), school_departments:school_department_id(name), school_positions:school_position_id(name), neighborhoods(name)').eq('status', 'active'),
       ]);
       setMeetings(m || []);
       setDepartments(d || []);
@@ -167,8 +167,10 @@ export default function MeetingManagement() {
       invitedStaff = allStaff.filter(s => 
         (meeting.participant_department_ids || []).includes(s.department_id) ||
         (meeting.participant_department_ids || []).includes(s.party_department_id) ||
+        (meeting.participant_department_ids || []).includes(s.school_department_id) ||
         (meeting.participant_position_ids || []).includes(s.position_id) ||
         (meeting.participant_position_ids || []).includes(s.party_position_id) ||
+        (meeting.participant_position_ids || []).includes(s.school_position_id) ||
         (meeting.participant_neighborhood_ids || []).includes(s.neighborhood_id)
       );
     }
@@ -238,13 +240,15 @@ export default function MeetingManagement() {
      return allStaff.filter(s => 
         form.participant_department_ids.includes(s.department_id) || 
         form.participant_department_ids.includes(s.party_department_id) ||
+        form.participant_department_ids.includes(s.school_department_id) ||
         form.participant_position_ids.includes(s.position_id) || 
         form.participant_position_ids.includes(s.party_position_id) ||
+        form.participant_position_ids.includes(s.school_position_id) ||
         form.participant_neighborhood_ids.includes(s.neighborhood_id)
      ).length;
   };
 
-  const orgLabel = (t: string) => t === 'party' ? '🚩 Đảng ủy' : t === 'government' ? '🏢 Chính quyền' : '📋 Tất cả';
+  const orgLabel = (t: string) => t === 'party' ? '🚩 Đảng ủy' : t === 'government' ? '🏢 Chính quyền' : t === 'school' ? '🎓 Nhà trường' : '📋 Tất cả';
   const formDepts = form.org_type === 'all' ? departments : departments.filter(d => d.org_type === form.org_type);
   const formPositions = form.org_type === 'all' ? positions : positions.filter(p => p.org_type === form.org_type);
 
@@ -279,15 +283,15 @@ export default function MeetingManagement() {
           <div>
             <label className="block text-xs font-bold text-brand-text uppercase mb-2 ml-1">Thuộc tổ chức</label>
             <div className="flex gap-2">
-              {(['party', 'government', 'all'] as const).map(t => (
+              {(['party', 'government', 'school', 'all'] as const).map(t => (
                 <button key={t} type="button" onClick={() => setForm({ ...form, org_type: t, participant_department_ids: [], participant_position_ids: [] })}
                   className={`flex-1 py-2.5 px-3 rounded-xl text-sm font-bold border-2 transition-all flex items-center justify-center gap-2 ${
                     form.org_type === t
-                      ? t === 'party' ? 'border-red-500 bg-red-50 text-red-700' : t === 'government' ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-purple-500 bg-purple-50 text-purple-700'
+                      ? t === 'party' ? 'border-red-500 bg-red-50 text-red-700' : t === 'government' ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : t === 'school' ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-purple-500 bg-purple-50 text-purple-700'
                       : 'border-gray-200 text-brand-text/50 hover:border-gray-300'
                   }`}
                 >
-                  {t === 'party' ? <><Flag size={14}/>Đảng ủy</> : t === 'government' ? <><Landmark size={14}/>UBND</> : <>📋 Tất cả</>}
+                  {t === 'party' ? <><Flag size={14}/>Đảng ủy</> : t === 'government' ? <><Landmark size={14}/>UBND</> : t === 'school' ? <><GraduationCap size={14}/>Trường</> : <>📋 Tất cả</>}
                 </button>
               ))}
             </div>
@@ -372,8 +376,8 @@ export default function MeetingManagement() {
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <h3 className="text-base font-bold text-brand-text">{item.title}</h3>
-                  <span className={`badge !text-[10px] !py-0.5 !px-2 ${item.org_type === 'party' ? 'bg-red-100 text-red-700' : item.org_type === 'government' ? 'bg-indigo-100 text-indigo-700' : 'bg-purple-100 text-purple-700'}`}>
-                    {item.org_type === 'party' ? '🚩 Đảng' : item.org_type === 'government' ? '🏢 CQ' : '📋 Chung'}
+                  <span className={`badge !text-[10px] !py-0.5 !px-2 ${item.org_type === 'party' ? 'bg-red-100 text-red-700' : item.org_type === 'government' ? 'bg-indigo-100 text-indigo-700' : item.org_type === 'school' ? 'bg-emerald-100 text-emerald-700' : 'bg-purple-100 text-purple-700'}`}>
+                    {item.org_type === 'party' ? '🚩 Đảng' : item.org_type === 'government' ? '🏢 CQ' : item.org_type === 'school' ? '🎓 Trường' : '📋 Chung'}
                   </span>
                 </div>
                 <div className="flex flex-wrap gap-4 text-xs text-brand-text/50 mt-1.5 font-medium">

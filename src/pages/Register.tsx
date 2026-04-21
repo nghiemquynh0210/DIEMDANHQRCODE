@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { UserPlus, Flag, Landmark, KeyRound, Smartphone, User, Loader2, AlertCircle, ArrowLeft, MapPin } from 'lucide-react';
+import { UserPlus, Flag, GraduationCap, Landmark, KeyRound, Smartphone, User, Loader2, AlertCircle, ArrowLeft, MapPin } from 'lucide-react';
 import { Department, Position, Neighborhood } from '../types';
 import { useNavigate } from 'react-router-dom';
 
@@ -14,17 +14,10 @@ export default function Register() {
   const [neighborhoods, setNeighborhoods] = useState<Neighborhood[]>([]);
   
   const [formData, setFormData] = useState({
-    fullName: '',
-    email: '',
-    phone: '',
-    password: '',
-    // Chính quyền
-    departmentId: '',
-    positionId: '',
-    // Đảng
-    partyDepartmentId: '',
-    partyPositionId: '',
-    // Khu phố
+    fullName: '', email: '', phone: '', password: '',
+    departmentId: '', positionId: '',
+    partyDepartmentId: '', partyPositionId: '',
+    schoolDepartmentId: '', schoolPositionId: '',
     neighborhoodId: '',
   });
 
@@ -36,8 +29,10 @@ export default function Register() {
 
   const partyDepts = departments.filter(d => d.org_type === 'party');
   const govDepts = departments.filter(d => d.org_type === 'government');
+  const schoolDepts = departments.filter(d => d.org_type === 'school');
   const partyPositions = positions.filter(p => p.org_type === 'party');
   const govPositions = positions.filter(p => p.org_type === 'government');
+  const schoolPositions = positions.filter(p => p.org_type === 'school');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,13 +55,13 @@ export default function Register() {
       if (authError) throw authError;
 
       const staffPayload = {
-        full_name: formData.fullName,
-        email: formData.email,
-        phone: formData.phone,
+        full_name: formData.fullName, email: formData.email, phone: formData.phone,
         department_id: formData.departmentId ? Number(formData.departmentId) : null,
         position_id: formData.positionId ? Number(formData.positionId) : null,
         party_department_id: formData.partyDepartmentId ? Number(formData.partyDepartmentId) : null,
         party_position_id: formData.partyPositionId ? Number(formData.partyPositionId) : null,
+        school_department_id: formData.schoolDepartmentId ? Number(formData.schoolDepartmentId) : null,
+        school_position_id: formData.schoolPositionId ? Number(formData.schoolPositionId) : null,
         neighborhood_id: formData.neighborhoodId ? Number(formData.neighborhoodId) : null,
         status: 'active',
       };
@@ -171,6 +166,23 @@ export default function Register() {
             <select className="input !bg-white" value={formData.positionId} onChange={e => setFormData({...formData, positionId: e.target.value})}>
               <option value="">-- Chức vụ CQ --</option>
               {govPositions.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          </div>
+
+          {/* Nhà trường Section */}
+          <div className="p-4 rounded-xl bg-emerald-50/60 border border-emerald-100 space-y-3">
+            <div className="flex items-center gap-2">
+              <GraduationCap size={14} className="text-emerald-500" />
+              <span className="text-sm font-bold text-emerald-700">Nhà trường</span>
+              <span className="text-[10px] text-emerald-400">(không bắt buộc)</span>
+            </div>
+            <select className="input !bg-white" value={formData.schoolDepartmentId} onChange={e => setFormData({...formData, schoolDepartmentId: e.target.value})}>
+              <option value="">-- Trường / Đơn vị GD --</option>
+              {schoolDepts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+            </select>
+            <select className="input !bg-white" value={formData.schoolPositionId} onChange={e => setFormData({...formData, schoolPositionId: e.target.value})}>
+              <option value="">-- Chức vụ Nhà trường --</option>
+              {schoolPositions.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </div>
 
