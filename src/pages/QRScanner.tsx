@@ -24,7 +24,7 @@ export default function QRScanner() {
   useEffect(() => {
     Promise.all([
       supabase.from('meetings').select('*').order('meeting_date', { ascending: false }).order('meeting_time', { ascending: false }),
-      supabase.from('staff').select('*, departments:department_id(name), positions:position_id(name), party_departments:party_department_id(name), party_positions:party_position_id(name), school_departments:school_department_id(name), school_positions:school_position_id(name), neighborhoods(name)').order('full_name'),
+      supabase.from('staff').select('*, departments:department_id(name), positions:position_id(name), party_departments:party_department_id(name), party_positions:party_position_id(name), school_departments:school_department_id(name), school_positions:school_position_id(name)').order('full_name'),
     ]).then(([
       { data: meetingsData },
       { data: staffData }
@@ -38,7 +38,6 @@ export default function QRScanner() {
         party_position_name: item.party_positions?.name || null,
         school_department_name: item.school_departments?.name || null,
         school_position_name: item.school_positions?.name || null,
-        neighborhood_name: item.neighborhoods?.name || null,
       }));
       setMeetings(m);
       setStaff(s);
@@ -50,7 +49,7 @@ export default function QRScanner() {
   const refreshAttendance = useCallback(async () => {
     if (!selectedMeetingId) return;
     const { data } = await supabase.from('attendance')
-      .select('*, staff(full_name, staff_code, departments(name), positions(name), neighborhoods(name))')
+      .select('*, staff(full_name, staff_code, departments(name), positions(name))')
       .eq('meeting_id', selectedMeetingId)
       .order('checkin_time', { ascending: false });
       
@@ -60,20 +59,18 @@ export default function QRScanner() {
       staff_code: item.staff?.staff_code || '--',
       position_name: item.staff?.positions?.name || '--',
       department_name: item.staff?.departments?.name || '--',
-      neighborhood_name: item.staff?.neighborhoods?.name || '--',
     }));
 
     const meeting = meetings.find(m => String(m.id) === String(selectedMeetingId));
     let invitedStaff = staff;
-    if (meeting && (meeting.participant_department_ids?.length || meeting.participant_position_ids?.length || meeting.participant_neighborhood_ids?.length)) {
+    if (meeting && (meeting.participant_department_ids?.length || meeting.participant_position_ids?.length)) {
        invitedStaff = staff.filter(s => 
          (meeting.participant_department_ids || []).includes(s.department_id) ||
          (meeting.participant_department_ids || []).includes(s.party_department_id) ||
          (meeting.participant_department_ids || []).includes(s.school_department_id) ||
          (meeting.participant_position_ids || []).includes(s.position_id) ||
          (meeting.participant_position_ids || []).includes(s.party_position_id) ||
-         (meeting.participant_position_ids || []).includes(s.school_position_id) ||
-         (meeting.participant_neighborhood_ids || []).includes(s.neighborhood_id)
+         (meeting.participant_position_ids || []).includes(s.school_position_id)
        );
     }
 

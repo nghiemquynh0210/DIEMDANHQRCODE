@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Building2, Check, Flag, GraduationCap, Landmark, MapPinned, Pencil, Plus, Shapes, Trash2, Users, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { Department, Neighborhood, Position } from '../types';
+import { Department, Position } from '../types';
 
 type OrgTab = 'party' | 'government' | 'school';
 
@@ -19,25 +19,21 @@ export default function DepartmentManagement({
   const [activeTab, setActiveTab] = useState<OrgTab>('party');
   const [departments, setDepartments] = useState<Department[]>([]);
   const [positions, setPositions] = useState<Position[]>([]);
-  const [neighborhoods, setNeighborhoods] = useState<Neighborhood[]>([]);
 
   const [newDept, setNewDept] = useState('');
   const [newPos, setNewPos] = useState('');
-  const [newNb, setNewNb] = useState('');
 
   // Inline edit state
   const [editingId, setEditingId] = useState<{ table: string; id: number } | null>(null);
   const [editingName, setEditingName] = useState('');
 
   const load = async () => {
-    const [{ data: a }, { data: b }, { data: c }] = await Promise.all([
+    const [{ data: a }, { data: b }] = await Promise.all([
       supabase.from('departments').select('*').order('name'),
-      supabase.from('positions').select('*').order('sort_order').order('name'),
-      supabase.from('neighborhoods').select('*').order('name'),
+      supabase.from('positions').select('*').order('sort_order').order('name')
     ]);
     setDepartments(a || []);
     setPositions(b || []);
-    setNeighborhoods(c || []);
   };
 
   useEffect(() => { load(); }, []);
@@ -48,20 +44,16 @@ export default function DepartmentManagement({
 
   const addDept = async () => {
     if (!newDept.trim()) return;
-    await supabase.from('departments').insert({ name: newDept.trim(), org_type: activeTab });
+    const { error } = await supabase.from('departments').insert({ name: newDept.trim(), org_type: activeTab });
+    if (error) { console.error(error); alert('Lỗi khi thêm đơn vị: ' + error.message); return; }
     setNewDept('');
     load();
   };
   const addPos = async () => {
     if (!newPos.trim()) return;
-    await supabase.from('positions').insert({ name: newPos.trim(), org_type: activeTab });
+    const { error } = await supabase.from('positions').insert({ name: newPos.trim(), org_type: activeTab });
+    if (error) { console.error(error); alert('Lỗi khi thêm chức vụ: ' + error.message); return; }
     setNewPos('');
-    load();
-  };
-  const addNb = async () => {
-    if (!newNb.trim()) return;
-    await supabase.from('neighborhoods').insert({ name: newNb.trim() });
-    setNewNb('');
     load();
   };
 
@@ -69,10 +61,28 @@ export default function DepartmentManagement({
     if (!confirm('Xác nhận xóa?')) return;
     const { error } = await supabase.from(table).delete().eq('id', id);
     if (error) {
-      console.error(error);
-      if (error.code === '23503') alert('Không thể xóa vì đang có nhân sự sử dụng dữ liệu này!');
-      else alert('Lỗi khi xóa: ' + error.message);
-      return;
+      if (error.code === '23503') {
+        const forceDecouple = confirm('CẢNH BÁO: Đang có nhân sự giữ chức vụ hoặc công tác tại đơn vị này! Bạn có muốn gỡ bỏ chức vụ/đơn vị này khỏi các nhân sự đó để tiếp tục xóa không?');
+        if (forceDecouple) {
+           if (table === 'positions') {
+             await supabase.from('staff').update({ position_id: null }).eq('position_id', id);
+             await supabase.from('staff').update({ party_position_id: null }).eq('party_position_id', id);
+             await supabase.from('staff').update({ school_position_id: null }).eq('school_position_id', id);
+           } else if (table === 'departments') {
+             await supabase.from('staff').update({ department_id: null }).eq('department_id', id);
+             await supabase.from('staff').update({ party_department_id: null }).eq('party_department_id', id);
+             await supabase.from('staff').update({ school_department_id: null }).eq('school_department_id', id);
+           }
+           const { error: finalErr } = await supabase.from(table).delete().eq('id', id);
+           if (finalErr) { alert('Vẫn báo lỗi sau khi gỡ: ' + finalErr.message); return; }
+        } else {
+           return;
+        }
+      } else {
+        console.error(error);
+        alert('Lỗi khi xóa: ' + error.message);
+        return;
+      }
     }
     load();
   };
@@ -175,7 +185,7 @@ export default function DepartmentManagement({
         })}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 max-w-5xl mx-auto">
         {/* ── ĐƠN VỊ ── */}
         <div className="card-no-hover flex flex-col">
           <div className="flex items-center gap-2.5 mb-4 pb-3 border-b border-gray-100">
@@ -213,25 +223,6 @@ export default function DepartmentManagement({
           <div className="flex-1 space-y-1.5 overflow-y-auto max-h-[400px] pr-1">
             {filteredPositions.map(item => renderItem(item, 'positions', `bg-${cfg.color}-50 text-${cfg.color}-600`))}
             {filteredPositions.length === 0 && (<p className="text-center text-brand-text/30 text-xs py-6">Chưa có chức vụ</p>)}
-          </div>
-        </div>
-
-        {/* ── KHU PHỐ (shared) ── */}
-        <div className="card-no-hover flex flex-col">
-          <div className="flex items-center gap-2.5 mb-4 pb-3 border-b border-gray-100">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-white"><MapPinned size={16} /></div>
-            <div>
-              <h3 className="font-bold text-sm text-brand-text">Khu phố</h3>
-              <p className="text-[10px] text-brand-text/35 font-medium">{neighborhoods.length} khu phố</p>
-            </div>
-          </div>
-          <div className="flex gap-2 mb-3">
-            <input className="input text-sm flex-1" placeholder="Tên khu phố mới..." value={newNb} onChange={e => setNewNb(e.target.value)} onKeyDown={e => e.key === 'Enter' && addNb()} />
-            <button onClick={addNb} className="btn-primary !py-2 !px-3 !rounded-lg shrink-0 !from-violet-500 !to-fuchsia-500"><Plus size={16} /></button>
-          </div>
-          <div className="flex-1 space-y-1.5 overflow-y-auto max-h-[400px] pr-1">
-            {neighborhoods.map(item => renderItem(item, 'neighborhoods', 'bg-violet-50 text-violet-600', true, { neighborhoodId: String(item.id) }))}
-            {neighborhoods.length === 0 && (<p className="text-center text-brand-text/30 text-xs py-6">Chưa có khu phố</p>)}
           </div>
         </div>
       </div>

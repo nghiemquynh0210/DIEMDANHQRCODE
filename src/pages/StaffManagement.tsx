@@ -3,26 +3,22 @@ import { Edit2, FileSpreadsheet, Flag, GraduationCap, Landmark, Plus, QrCode as 
 import QRCode from 'qrcode';
 import * as XLSX from 'xlsx';
 import { supabase } from '../lib/supabase';
-import { Department, Neighborhood, Position, Staff } from '../types';
+import { Department, Position, Staff } from '../types';
 
 export default function StaffManagement({
   initialDepartmentId,
-  initialNeighborhoodId,
   autoOpenAdd,
   onClearParams,
 }: {
   initialDepartmentId?: string;
-  initialNeighborhoodId?: string;
   autoOpenAdd?: boolean;
   onClearParams?: () => void;
 }) {
   const [staff, setStaff] = useState<Staff[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [positions, setPositions] = useState<Position[]>([]);
-  const [neighborhoods, setNeighborhoods] = useState<Neighborhood[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDept, setSelectedDept] = useState(initialDepartmentId || 'all');
-  const [selectedNeighborhood, setSelectedNeighborhood] = useState(initialNeighborhoodId || 'all');
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Staff | null>(null);
   const [qr, setQr] = useState<{ name: string; url: string } | null>(null);
@@ -31,22 +27,19 @@ export default function StaffManagement({
     position_id: '', department_id: initialDepartmentId || '',
     party_position_id: '', party_department_id: '',
     school_position_id: '', school_department_id: '',
-    neighborhood_id: initialNeighborhoodId || '',
     phone: '', email: '', status: 'active', notes: '',
   });
 
   const load = async () => {
     try {
-      const [{ data: s }, { data: d }, { data: p }, { data: n }] = await Promise.all([
+      const [{ data: s }, { data: d }, { data: p }] = await Promise.all([
         supabase.from('staff').select(`
           *, departments:department_id(name), positions:position_id(name),
           party_departments:party_department_id(name), party_positions:party_position_id(name),
-          school_departments:school_department_id(name), school_positions:school_position_id(name),
-          neighborhoods(name)
+          school_departments:school_department_id(name), school_positions:school_position_id(name)
         `).order('full_name'),
         supabase.from('departments').select('*').order('name'),
-        supabase.from('positions').select('*').order('sort_order').order('name'),
-        supabase.from('neighborhoods').select('*').order('name'),
+        supabase.from('positions').select('*').order('sort_order').order('name')
       ]);
       const mappedStaff = (s || []).map((item: any) => ({
         ...item,
@@ -56,12 +49,10 @@ export default function StaffManagement({
         party_position_name: item.party_positions?.name || null,
         school_department_name: item.school_departments?.name || null,
         school_position_name: item.school_positions?.name || null,
-        neighborhood_name: item.neighborhoods?.name || null,
       }));
       setStaff(mappedStaff);
       setDepartments(d || []);
       setPositions(p || []);
-      setNeighborhoods(n || []);
     } catch (err) {
       console.error('Failed to load staff data:', err);
     }
@@ -87,16 +78,15 @@ export default function StaffManagement({
       (item.party_position_name || '').toLowerCase().includes(q) ||
       (item.school_position_name || '').toLowerCase().includes(q);
     const okDept = selectedDept === 'all' || [item.department_id, item.party_department_id, item.school_department_id].map(String).includes(selectedDept);
-    const okNeighborhood = selectedNeighborhood === 'all' || String(item.neighborhood_id || '') === selectedNeighborhood;
-    return hit && okDept && okNeighborhood;
-  }), [staff, searchTerm, selectedDept, selectedNeighborhood]);
+    return hit && okDept;
+  }), [staff, searchTerm, selectedDept]);
 
   const reset = () => {
     setEditing(null);
     setForm({
       staff_code: '', full_name: '', position_id: '', department_id: initialDepartmentId || '',
       party_position_id: '', party_department_id: '', school_position_id: '', school_department_id: '',
-      neighborhood_id: initialNeighborhoodId || '', phone: '', email: '', status: 'active', notes: '',
+      phone: '', email: '', status: 'active', notes: '',
     });
   };
 
@@ -110,7 +100,6 @@ export default function StaffManagement({
       party_position_id: form.party_position_id ? Number(form.party_position_id) : null,
       school_department_id: form.school_department_id ? Number(form.school_department_id) : null,
       school_position_id: form.school_position_id ? Number(form.school_position_id) : null,
-      neighborhood_id: form.neighborhood_id ? Number(form.neighborhood_id) : null,
       phone: form.phone || '', email: form.email || '',
       status: form.status || 'active', notes: form.notes || '',
     };
@@ -137,7 +126,7 @@ export default function StaffManagement({
       'CV Đảng': item.party_position_name || '', 'Chi bộ': item.party_department_name || '',
       'CV CQ': item.position_name || '', 'Phòng ban': item.department_name || '',
       'CV Trường': item.school_position_name || '', 'Trường': item.school_department_name || '',
-      'Khu phố': item.neighborhood_name || '', 'SĐT': item.phone,
+      'SĐT': item.phone,
     }));
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
@@ -165,8 +154,7 @@ export default function StaffManagement({
       party_department_id: item.party_department_id ? String(item.party_department_id) : '',
       school_position_id: item.school_position_id ? String(item.school_position_id) : '',
       school_department_id: item.school_department_id ? String(item.school_department_id) : '',
-      neighborhood_id: item.neighborhood_id ? String(item.neighborhood_id) : '',
-      phone: item.phone, email: item.email, status: item.status, notes: item.notes || '',
+      phone: item.phone || '', email: item.email || '', status: item.status, notes: item.notes || '',
     });
     setShowForm(true);
   };
@@ -185,10 +173,6 @@ export default function StaffManagement({
             <optgroup label="🚩 Đảng ủy">{partyDepts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</optgroup>
             <optgroup label="🏢 Chính quyền">{govDepts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</optgroup>
             <optgroup label="🎓 Nhà trường">{schoolDepts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</optgroup>
-          </select>
-          <select className="input w-full sm:w-48 min-w-0" value={selectedNeighborhood} onChange={(e) => setSelectedNeighborhood(e.target.value)}>
-            <option value="all">Tất cả khu phố</option>
-            {neighborhoods.map(n => <option key={n.id} value={n.id}>{n.name}</option>)}
           </select>
           <div className="flex gap-3 ml-auto">
             <button className="btn-secondary" onClick={exportExcel}><FileSpreadsheet size={16} />Xuất Excel</button>
@@ -259,9 +243,8 @@ export default function StaffManagement({
             </div>
           </div>
 
-          {/* Khu phố + Trạng thái */}
+          {/* Trạng thái */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-            <select className="input" value={form.neighborhood_id} onChange={e => setForm({ ...form, neighborhood_id: e.target.value })}><option value="">Chọn khu phố</option>{neighborhoods.map(n => <option key={n.id} value={n.id}>{n.name}</option>)}</select>
             <select className="input" value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}><option value="active">Đang hoạt động</option><option value="inactive">Ngừng sử dụng</option></select>
             <textarea className="input md:col-span-2 min-h-[80px]" placeholder="Ghi chú" value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />
           </div>

@@ -30,11 +30,11 @@ export default function Reports() {
 
         const { data: attData } = await supabase
           .from('attendance')
-          .select('*, staff(id, full_name, staff_code, departments(name), positions(name), neighborhoods(name))')
+          .select('*, staff(id, full_name, staff_code, departments(name), positions(name))')
           .eq('meeting_id', selectedMeetingId)
           .order('checkin_time', { ascending: false });
 
-        let staffQuery = supabase.from('staff').select('id, full_name, staff_code, departments(name), positions(name), neighborhoods(name)').eq('status', 'active');
+        let staffQuery = supabase.from('staff').select('id, full_name, staff_code, departments(name), positions(name)').eq('status', 'active');
         
         const orConditions = [];
         if (meeting.participant_department_ids?.length) {
@@ -42,9 +42,6 @@ export default function Reports() {
         }
         if (meeting.participant_position_ids?.length) {
             orConditions.push(`position_id.in.(${meeting.participant_position_ids.join(',')})`);
-        }
-        if (meeting.participant_neighborhood_ids?.length) {
-            orConditions.push(`neighborhood_id.in.(${meeting.participant_neighborhood_ids.join(',')})`);
         }
         
         if (orConditions.length > 0) {
@@ -61,7 +58,6 @@ export default function Reports() {
           staff_code: item.staff?.staff_code || '--',
           department_name: item.staff?.departments?.name || '--',
           position_name: item.staff?.positions?.name || '--',
-          neighborhood_name: item.staff?.neighborhoods?.name || '--',
         }));
 
         const absentStaff = (staffData || []).filter(s => !attendedStaffIds.has(s.id));
@@ -77,7 +73,6 @@ export default function Reports() {
             staff_code: s.staff_code || '--',
             department_name: s.departments?.name || '--',
             position_name: s.positions?.name || '--',
-            neighborhood_name: s.neighborhoods?.name || '--',
         }));
 
         setAttendance([...mappedAttendance, ...mappedAbsent]);
@@ -98,7 +93,6 @@ export default function Reports() {
       'Mã cán bộ': item.staff_code,
       'Chức danh': item.position_name,
       'Phòng ban': item.department_name,
-      'Khu phố': item.neighborhood_name,
       'Thời gian quét': item.checkin_time ? formatTime(item.checkin_time) : '--:--',
       'Trạng thái': item.status === 'present' ? 'Đúng giờ' : item.status === 'late' ? 'Đi trễ' : 'Vắng',
     })));
@@ -192,7 +186,7 @@ export default function Reports() {
                 </td>
                 <td className="hidden md:table-cell">
                   <div className="text-sm">{item.position_name || '--'}</div>
-                  <div className="text-[10px] text-brand-text/35">{item.department_name || '--'} / {item.neighborhood_name || '--'}</div>
+                  <div className="text-[10px] text-brand-text/35">{item.department_name || '--'}</div>
                 </td>
                 <td>
                   <span className="font-mono text-sm font-medium">{item.checkin_time ? formatTime(item.checkin_time) : '--:--'}</span>

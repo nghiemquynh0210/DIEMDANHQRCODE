@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { UserPlus, Flag, GraduationCap, Landmark, KeyRound, Smartphone, User, Loader2, AlertCircle, ArrowLeft, MapPin } from 'lucide-react';
-import { Department, Position, Neighborhood } from '../types';
+import { UserPlus, Flag, GraduationCap, Landmark, KeyRound, Smartphone, User, Loader2, AlertCircle, ArrowLeft } from 'lucide-react';
+import { Department, Position } from '../types';
 import { useNavigate } from 'react-router-dom';
 
 export default function Register() {
@@ -11,20 +11,17 @@ export default function Register() {
   
   const [departments, setDepartments] = useState<Department[]>([]);
   const [positions, setPositions] = useState<Position[]>([]);
-  const [neighborhoods, setNeighborhoods] = useState<Neighborhood[]>([]);
   
   const [formData, setFormData] = useState({
     fullName: '', email: '', phone: '', password: '',
     departmentId: '', positionId: '',
     partyDepartmentId: '', partyPositionId: '',
     schoolDepartmentId: '', schoolPositionId: '',
-    neighborhoodId: '',
   });
 
   useEffect(() => {
     supabase.from('departments').select('*').order('name').then(({ data }) => setDepartments(data || []));
     supabase.from('positions').select('*').order('name').then(({ data }) => setPositions(data || []));
-    supabase.from('neighborhoods').select('*').order('name').then(({ data }) => setNeighborhoods(data || []));
   }, []);
 
   const partyDepts = departments.filter(d => d.org_type === 'party');
@@ -62,7 +59,6 @@ export default function Register() {
         party_position_id: formData.partyPositionId ? Number(formData.partyPositionId) : null,
         school_department_id: formData.schoolDepartmentId ? Number(formData.schoolDepartmentId) : null,
         school_position_id: formData.schoolPositionId ? Number(formData.schoolPositionId) : null,
-        neighborhood_id: formData.neighborhoodId ? Number(formData.neighborhoodId) : null,
         status: 'active',
       };
 
@@ -183,15 +179,6 @@ export default function Register() {
             <select className="input !bg-white" value={formData.schoolPositionId} onChange={e => setFormData({...formData, schoolPositionId: e.target.value})}>
               <option value="">-- Chức vụ Nhà trường --</option>
               {schoolPositions.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-          </div>
-
-          {/* Khu phố */}
-          <div className="relative group">
-            <MapPin size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-brand-text/40" />
-            <select className="input pl-10 appearance-none bg-white" value={formData.neighborhoodId} onChange={e => setFormData({...formData, neighborhoodId: e.target.value})}>
-              <option value="">-- Chọn khu phố --</option>
-              {neighborhoods.map(n => <option key={n.id} value={n.id}>{n.name}</option>)}
             </select>
           </div>
 

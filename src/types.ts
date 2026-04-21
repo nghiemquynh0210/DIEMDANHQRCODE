@@ -16,14 +16,6 @@ export interface Position {
   created_at: string;
 }
 
-export interface Neighborhood {
-  id: number;
-  name: string;
-  code?: string;
-  description?: string;
-  created_at: string;
-}
-
 export interface Staff {
   id: number;
   staff_code?: string;
@@ -40,8 +32,6 @@ export interface Staff {
   school_position_name?: string | null;
   school_department_id?: number | null;
   school_department_name?: string | null;
-  neighborhood_id?: number | null;
-  neighborhood_name?: string | null;
   phone: string;
   email: string;
   qr_code?: string;
@@ -57,7 +47,6 @@ export interface Meeting {
   org_type: 'party' | 'government' | 'school' | 'all';
   participant_department_ids: number[];
   participant_position_ids: number[];
-  participant_neighborhood_ids: number[];
   meeting_date: string;
   meeting_time: string;
   meeting_end_time?: string;
@@ -74,7 +63,6 @@ export interface Attendance {
   staff_code?: string;
   position_name?: string | null;
   department_name?: string | null;
-  neighborhood_name?: string | null;
   checkin_time: string;
   checkin_method?: 'qr' | 'manual' | 'self';
   status: 'present' | 'late' | 'absent';

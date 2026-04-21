@@ -2,14 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { Calendar, Clock, Edit2, Flag, GraduationCap, Landmark, MapPin, Plus, QrCode, Trash2, Users, X, ChevronDown, ChevronUp } from 'lucide-react';
 import QRCode from 'qrcode';
 import { supabase } from '../lib/supabase';
-import { Department, Meeting, Neighborhood, Position } from '../types';
+import { Department, Meeting, Position } from '../types';
 import { formatDate, formatTime } from '../lib/utils';
 
 export default function MeetingManagement() {
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [positions, setPositions] = useState<Position[]>([]);
-  const [neighborhoods, setNeighborhoods] = useState<Neighborhood[]>([]);
+  
   const [allStaff, setAllStaff] = useState<any[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Meeting | null>(null);
@@ -22,7 +22,6 @@ export default function MeetingManagement() {
     org_type: 'all' as 'party' | 'government' | 'all',
     participant_department_ids: [] as number[],
     participant_position_ids: [] as number[],
-    participant_neighborhood_ids: [] as number[],
     meeting_date: new Date().toISOString().split('T')[0],
     meeting_time: '08:00',
     meeting_end_time: '11:00',
@@ -51,7 +50,6 @@ export default function MeetingManagement() {
       setMeetings(m || []);
       setDepartments(d || []);
       setPositions(p || []);
-      setNeighborhoods(n || []);
       setAllStaff(s || []);
     } catch (err) {
       console.error('Failed to load data:', err);
@@ -124,7 +122,7 @@ export default function MeetingManagement() {
       setShowForm(false);
       setEditing(null);
       setIsAllStaff(false);
-      setForm({ title: '', content: '', org_type: 'all', participant_department_ids: [], participant_position_ids: [], participant_neighborhood_ids: [], meeting_date: new Date().toISOString().split('T')[0], meeting_time: '08:00', meeting_end_time: '11:00', location: 'Hội trường UBND phường An Phú' });
+      setForm({ title: '', content: '', org_type: 'all', participant_department_ids: [], participant_position_ids: [], meeting_date: new Date().toISOString().split('T')[0], meeting_time: '08:00', meeting_end_time: '11:00', location: 'Hội trường UBND phường An Phú' });
       load();
     } catch (err: any) {
       console.error('Save error:', err);
@@ -163,15 +161,14 @@ export default function MeetingManagement() {
       .order('checkin_time', { ascending: false });
 
     let invitedStaff = allStaff;
-    if (meeting.participant_department_ids?.length || meeting.participant_position_ids?.length || meeting.participant_neighborhood_ids?.length) {
+    if (meeting.participant_department_ids?.length || meeting.participant_position_ids?.length) {
       invitedStaff = allStaff.filter(s => 
         (meeting.participant_department_ids || []).includes(s.department_id) ||
         (meeting.participant_department_ids || []).includes(s.party_department_id) ||
         (meeting.participant_department_ids || []).includes(s.school_department_id) ||
         (meeting.participant_position_ids || []).includes(s.position_id) ||
         (meeting.participant_position_ids || []).includes(s.party_position_id) ||
-        (meeting.participant_position_ids || []).includes(s.school_position_id) ||
-        (meeting.participant_neighborhood_ids || []).includes(s.neighborhood_id)
+        (meeting.participant_position_ids || []).includes(s.school_position_id)
       );
     }
 
@@ -183,7 +180,6 @@ export default function MeetingManagement() {
       staff_code: item.staff?.staff_code || '--',
       department_name: item.staff?.departments?.name || '--',
       position_name: item.staff?.positions?.name || '--',
-      neighborhood_name: item.staff?.neighborhoods?.name || '--',
     }));
 
     const absentStaff = invitedStaff.filter(s => !attendedStaffIds.has(s.id));
@@ -320,7 +316,7 @@ export default function MeetingManagement() {
                 <button type="button" onClick={() => setIsAllStaff(true)} className={`badge !py-1.5 !px-3 !rounded-lg text-sm transition-all ${isAllStaff ? 'bg-indigo-600 text-white shadow-md' : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'}`}>Tất cả mọi người</button>
                 <button type="button" onClick={() => selectMacro('heads')} className="badge !py-1.5 !px-3 !rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 text-sm transition-colors">Các Trưởng ban/ngành</button>
                 <button type="button" onClick={() => selectMacro('deputies')} className="badge !py-1.5 !px-3 !rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-sm transition-colors">Các Phó ngành</button>
-                <button type="button" onClick={() => { setIsAllStaff(false); setForm(prev => ({ ...prev, participant_department_ids: [], participant_position_ids: [], participant_neighborhood_ids: [] })) }} className="badge !py-1.5 !px-3 !rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 text-sm transition-colors cursor-pointer">Xóa bộ chọn</button>
+                <button type="button" onClick={() => { setIsAllStaff(false); setForm(prev => ({ ...prev, participant_department_ids: [], participant_position_ids: [] })) }} className="badge !py-1.5 !px-3 !rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 text-sm transition-colors cursor-pointer">Xóa bộ chọn</button>
               </div>
             </div>
 
@@ -330,7 +326,6 @@ export default function MeetingManagement() {
                   <Selection title={`Chức danh mời ${form.org_type !== 'all' ? `(${orgLabel(form.org_type)})` : ''}`} items={formPositions} selected={form.participant_position_ids} onToggle={(id) => toggle('participant_position_ids', id)} />
                 </div>
                 <Selection title={`Đơn vị mời ${form.org_type !== 'all' ? `(${orgLabel(form.org_type)})` : ''}`} items={formDepts} selected={form.participant_department_ids} onToggle={(id) => toggle('participant_department_ids', id)} />
-                <Selection title="Khu phố mời" items={neighborhoods} selected={form.participant_neighborhood_ids} onToggle={(id) => toggle('participant_neighborhood_ids', id)} />
               </div>
             ) : (
               <div className="p-4 rounded-xl border border-indigo-200 bg-indigo-50/50 text-sm text-indigo-700">

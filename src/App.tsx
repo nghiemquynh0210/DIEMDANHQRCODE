@@ -213,7 +213,6 @@ export default function App() {
           {activePage === 'staff' && (
             <StaffManagement
               initialDepartmentId={navigationParams.departmentId}
-              initialNeighborhoodId={navigationParams.neighborhoodId}
               autoOpenAdd={navigationParams.triggerAdd}
               onClearParams={() => setNavigationParams({})}
             />
