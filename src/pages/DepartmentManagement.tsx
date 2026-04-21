@@ -3,7 +3,7 @@ import { Building2, Check, Flag, GraduationCap, Landmark, MapPinned, Pencil, Plu
 import { supabase } from '../lib/supabase';
 import { Department, Position } from '../types';
 
-type OrgTab = 'party' | 'government' | 'school';
+type OrgTab = 'party' | 'government';
 
 const TAB_CONFIG = {
   party:      { label: 'Đảng ủy',    icon: Flag,          deptLabel: 'Chi bộ / Đơn vị Đảng', posLabel: 'Chức vụ Đảng',       deptPH: 'VD: Chi bộ cơ quan...',     posPH: 'VD: Bí thư, Phó BT...',     color: 'red',     gradient: 'from-red-500 to-rose-500',     posGradient: 'from-orange-500 to-amber-500' },
@@ -168,7 +168,7 @@ export default function DepartmentManagement({
 
       {/* 3 Tabs */}
       <div className="flex gap-1.5 p-1 bg-gray-100 rounded-xl">
-        {(['party', 'government', 'school'] as OrgTab[]).map(tab => {
+        {(['party', 'government'] as OrgTab[]).map(tab => {
           const t = TAB_CONFIG[tab];
           const Icon = t.icon;
           const isActive = activeTab === tab;
