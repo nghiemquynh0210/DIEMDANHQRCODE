@@ -18,6 +18,7 @@ export default function App() {
   const [activePage, setActivePage] = useState<Page>('dashboard');
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const [isSidebarOpen, setIsSidebarOpen] = useState(!isMobile);
+  const [refreshKey, setRefreshKey] = useState(0);
   const { user, loading, signOut } = useAuth();
   
   const [navigationParams, setNavigationParams] = useState<{
@@ -34,6 +35,17 @@ export default function App() {
 
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Auto-refresh data when user returns to the tab
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        setRefreshKey(k => k + 1);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, []);
 
   // Auto-route normal staff to QR scanner by default
@@ -208,22 +220,26 @@ export default function App() {
 
         {/* Page Content */}
         <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 bg-gradient-to-br from-brand-bg to-indigo-50/30">
-          {activePage === 'dashboard' && <Dashboard />}
+          {activePage === 'dashboard' && <Dashboard key={`dash-${refreshKey}`} />}
           {activePage === 'staff' && (
-            <StaffManagement
-              initialDepartmentId={navigationParams.departmentId}
-              autoOpenAdd={navigationParams.triggerAdd}
-              onClearParams={() => setNavigationParams({})}
-            />
+            <React.Fragment key={`staff-${refreshKey}`}>
+              <StaffManagement
+                initialDepartmentId={navigationParams.departmentId}
+                autoOpenAdd={navigationParams.triggerAdd}
+                onClearParams={() => setNavigationParams({})}
+              />
+            </React.Fragment>
           )}
           {activePage === 'departments' && (
-            <DepartmentManagement onNavigateToStaff={(params) => navigateToPage('staff', params)} />
+            <React.Fragment key={`dept-${refreshKey}`}>
+              <DepartmentManagement onNavigateToStaff={(params) => navigateToPage('staff', params)} />
+            </React.Fragment>
           )}
-          {activePage === 'meetings' && <MeetingManagement />}
-          {activePage === 'qr' && <QRScanner />}
-          {activePage === 'staff-qr' && <StaffQRScanner />}
-          {activePage === 'reports' && <Reports />}
-          {activePage === 'settings' && <SettingsPage />}
+          {activePage === 'meetings' && <MeetingManagement key={`meet-${refreshKey}`} />}
+          {activePage === 'qr' && <QRScanner key={`qr-${refreshKey}`} />}
+          {activePage === 'staff-qr' && <StaffQRScanner key={`sqr-${refreshKey}`} />}
+          {activePage === 'reports' && <Reports key={`rpt-${refreshKey}`} />}
+          {activePage === 'settings' && <SettingsPage key={`set-${refreshKey}`} />}
         </div>
       </main>
     </div>
