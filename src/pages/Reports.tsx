@@ -58,8 +58,10 @@ export default function Reports() {
           ...item,
           full_name: item.staff?.full_name || '--',
           staff_code: item.staff?.staff_code || '--',
-          department_name: item.staff?.departments?.name || item.staff?.party_departments?.name || '--',
-          position_name: item.staff?.positions?.name || item.staff?.party_positions?.name || '--',
+          department_name: item.staff?.departments?.name || null,
+          position_name: item.staff?.positions?.name || null,
+          party_department_name: item.staff?.party_departments?.name || null,
+          party_position_name: item.staff?.party_positions?.name || null,
         }));
 
         const absentStaff = (staffData || []).filter(s => !attendedStaffIds.has(s.id));
@@ -73,8 +75,10 @@ export default function Reports() {
             status: 'absent',
             full_name: s.full_name || '--',
             staff_code: s.staff_code || '--',
-            department_name: s.departments?.name || s.party_departments?.name || '--',
-            position_name: s.positions?.name || s.party_positions?.name || '--',
+            department_name: s.departments?.name || null,
+            position_name: s.positions?.name || null,
+            party_department_name: s.party_departments?.name || null,
+            party_position_name: s.party_positions?.name || null,
         }));
 
         setAttendance([...mappedAttendance, ...mappedAbsent]);
@@ -93,8 +97,10 @@ export default function Reports() {
       STT: index + 1,
       'Họ và tên': item.full_name,
       'Mã cán bộ': item.staff_code,
-      'Chức danh': item.position_name,
-      'Phòng ban': item.department_name,
+      'CV Đảng': item.party_position_name || '',
+      'Đơn vị Đảng': item.party_department_name || '',
+      'CV Chính quyền': item.position_name || '',
+      'Phòng ban CQ': item.department_name || '',
       'Thời gian quét': item.checkin_time ? formatTime(item.checkin_time) : '--:--',
       'Trạng thái': item.status === 'present' ? 'Đúng giờ' : item.status === 'late' ? 'Đi trễ' : 'Vắng',
     })));
@@ -187,8 +193,25 @@ export default function Reports() {
                   </div>
                 </td>
                 <td className="hidden md:table-cell">
-                  <div className="text-sm">{item.position_name || '--'}</div>
-                  <div className="text-[10px] text-brand-text/35">{item.department_name || '--'}</div>
+                  <div className="space-y-1">
+                    {(item.party_position_name || item.party_department_name) && (
+                      <div className="flex items-center gap-1.5">
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-red-50 text-red-600 border border-red-100 shrink-0">Đảng</span>
+                        <span className="text-xs font-semibold text-brand-text/70">{item.party_position_name || '--'}</span>
+                        {item.party_department_name && <span className="text-[10px] text-brand-text/40">• {item.party_department_name}</span>}
+                      </div>
+                    )}
+                    {(item.position_name || item.department_name) && (
+                      <div className="flex items-center gap-1.5">
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-50 text-blue-600 border border-blue-100 shrink-0">CQ</span>
+                        <span className="text-xs font-semibold text-brand-text/70">{item.position_name || '--'}</span>
+                        {item.department_name && <span className="text-[10px] text-brand-text/40">• {item.department_name}</span>}
+                      </div>
+                    )}
+                    {!item.party_position_name && !item.party_department_name && !item.position_name && !item.department_name && (
+                      <span className="text-xs text-brand-text/30">--</span>
+                    )}
+                  </div>
                 </td>
                 <td>
                   <span className="font-mono text-sm font-medium">{item.checkin_time ? formatTime(item.checkin_time) : '--:--'}</span>
