@@ -189,9 +189,25 @@ export default function Reports() {
                     <div>
                       <div className="font-semibold text-sm">{item.full_name}</div>
                       <div className="text-[10px] text-brand-text/35 font-mono">{item.staff_code || '--'}</div>
+                      {/* Mobile-only: show roles under name */}
+                      <div className="md:hidden mt-1 space-y-0.5">
+                        {(item.party_position_name || item.party_department_name) && (
+                          <div className="flex items-center gap-1 flex-wrap">
+                            <span className="inline-flex px-1 py-0.5 rounded text-[8px] font-bold bg-red-50 text-red-600 border border-red-100">Đảng</span>
+                            <span className="text-[10px] font-medium text-brand-text/60">{item.party_position_name}{item.party_department_name ? ` • ${item.party_department_name}` : ''}</span>
+                          </div>
+                        )}
+                        {(item.position_name || item.department_name) && (
+                          <div className="flex items-center gap-1 flex-wrap">
+                            <span className="inline-flex px-1 py-0.5 rounded text-[8px] font-bold bg-blue-50 text-blue-600 border border-blue-100">CQ</span>
+                            <span className="text-[10px] font-medium text-brand-text/60">{item.position_name}{item.department_name ? ` • ${item.department_name}` : ''}</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </td>
+                {/* Desktop-only: separate Cơ cấu column */}
                 <td className="hidden md:table-cell">
                   <div className="space-y-1">
                     {(item.party_position_name || item.party_department_name) && (
